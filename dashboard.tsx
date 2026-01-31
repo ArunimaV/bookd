@@ -8,11 +8,10 @@ import { globalStyles } from "./dashboard/styles";
 import { Icons } from "./dashboard/icons";
 
 // Data
-import { LEADS, APPOINTMENTS, WEEKLY_STATS } from "./dashboard/data";
+import { LEADS, APPOINTMENTS, WEEKLY_STATS, EMPLOYEES, BUSINESS_ANALYTICS } from "./dashboard/data";
 
 // Components
 import { Header } from "./dashboard/components/Header";
-import { TabNav } from "./dashboard/components/TabNav";
 import { StatsGrid } from "./dashboard/components/StatsGrid";
 
 // Types
@@ -27,6 +26,9 @@ const CalendarTab = lazy(() =>
 );
 const LeadsTab = lazy(() =>
   import("./dashboard/tabs/LeadsTab").then((m) => ({ default: m.LeadsTab }))
+);
+const BusinessAnalyticsTab = lazy(() =>
+  import("./dashboard/tabs/BusinessAnalyticsTab").then((m) => ({ default: m.BusinessAnalyticsTab }))
 );
 
 // Loading fallback component
@@ -52,22 +54,28 @@ function TabLoadingFallback() {
 function getTabDefinitions(leads: Lead[]): TabDef[] {
   return [
     {
-      id: "inbox",
-      label: "Inbox",
-      icon: Icons.inbox,
-      count: leads.filter((l) => l.status === "new" || l.status === "urgent").length,
-    },
-    {
       id: "calendar",
       label: "Calendar",
       icon: Icons.calendar,
       count: null,
     },
     {
+      id: "inbox",
+      label: "Inbox",
+      icon: Icons.inbox,
+      count: leads.filter((l) => l.status === "new" || l.status === "urgent").length,
+    },
+    {
       id: "leads",
       label: "All Leads",
       icon: Icons.people,
       count: leads.length,
+    },
+    {
+      id: "business_analytics",
+      label: "Business Analytics",
+      icon: Icons.chartBar,
+      count: null,
     },
   ];
 }
@@ -79,12 +87,19 @@ function TabContent({ activeTab }: { activeTab: TabId }): ReactNode {
       {activeTab === "inbox" && <InboxTab leads={LEADS} />}
       {activeTab === "calendar" && <CalendarTab appointments={APPOINTMENTS} />}
       {activeTab === "leads" && <LeadsTab leads={LEADS} />}
+      {activeTab === "business_analytics" && (
+        <BusinessAnalyticsTab
+          analytics={BUSINESS_ANALYTICS}
+          appointments={APPOINTMENTS}
+          employees={EMPLOYEES}
+        />
+      )}
     </Suspense>
   );
 }
 
 export default function App(): ReactNode {
-  const [activeTab, setActiveTab] = useState<TabId>("inbox");
+  const [activeTab, setActiveTab] = useState<TabId>("calendar");
 
   const tabs = getTabDefinitions(LEADS);
 
@@ -109,16 +124,17 @@ export default function App(): ReactNode {
           minHeight: "100vh",
         }}
       >
-        {/* Header */}
-        <Header />
+        {/* Header with hamburger menu */}
+        <Header
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+        />
 
         {/* Main Content */}
         <div style={{ padding: "20px 28px" }}>
           {/* Stats Grid */}
           <StatsGrid stats={WEEKLY_STATS} />
-
-          {/* Tab Navigation */}
-          <TabNav tabs={tabs} activeTab={activeTab} onTabChange={handleTabChange} />
 
           {/* Tab Content (Code Split) */}
           <TabContent activeTab={activeTab} />

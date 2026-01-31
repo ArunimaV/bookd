@@ -1,10 +1,10 @@
 import { ReactNode } from "react";
 
 export type LeadStatus = "new" | "in_progress" | "handled" | "urgent";
-export type AppointmentStatus = "confirmed" | "pending" | "reminder_sent";
+export type AppointmentStatus = "confirmed" | "pending" | "reminder_sent" | "cancelled";
 export type Channel = "call" | "text";
 export type AllStatus = LeadStatus | AppointmentStatus;
-export type TabId = "inbox" | "calendar" | "leads";
+export type TabId = "inbox" | "calendar" | "leads" | "business_analytics";
 export type InboxFilter = "all" | "new" | "replied" | "urgent";
 
 export interface Lead {
@@ -28,6 +28,14 @@ export interface Appointment {
   duration: string;
   status: AppointmentStatus;
   phone: string;
+  assignedTo?: string;
+}
+
+export interface BusinessAnalytics {
+  totalClients: number;
+  clientsThisWeek: number;
+  clientsLastWeek: number;
+  cancellationsThisWeek: number;
 }
 
 export interface WeeklyStats {

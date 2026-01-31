@@ -10,6 +10,7 @@ const STATUS_MAP: Record<string, StatusStyle> = {
   confirmed: { label: "Confirmed", bg: C.greenLight, color: C.greenDark, dot: C.green },
   pending: { label: "Pending", bg: C.yellowLight, color: "#9A7B1A", dot: C.yellow },
   reminder_sent: { label: "Reminded", bg: C.blueLight, color: C.blue, dot: C.blue },
+  cancelled: { label: "Cancelled", bg: C.redLight, color: C.red, dot: C.red },
 };
 
 interface StatusPillProps {
