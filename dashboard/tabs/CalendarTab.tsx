@@ -9,7 +9,7 @@ interface CalendarTabProps {
   appointments: Appointment[];
 }
 
-const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -32,8 +32,8 @@ function isSameDay(d1: Date, d2: Date): boolean {
 
 function getWeekStart(date: Date): Date {
   const d = new Date(date);
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day; // Monday = 0
+  const day = d.getDay(); // Sunday = 0
+  const diff = -day; // move back to Sunday of the same week
   d.setDate(d.getDate() + diff);
   return d;
 }
@@ -196,7 +196,7 @@ interface SingleDayViewProps {
 }
 
 function SingleDayView({ date, isToday, appointments }: SingleDayViewProps) {
-  const dayName = DAY_NAMES[date.getDay() === 0 ? 6 : date.getDay() - 1];
+  const dayName = DAY_NAMES[date.getDay()];
   const dateLabel = `${dayName}, ${MONTH_NAMES[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
   return (
     <div
