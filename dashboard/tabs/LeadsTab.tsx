@@ -140,7 +140,7 @@ function LeadCardFull({ lead, index }: LeadCardFullProps) {
               fontFamily: C.body,
             }}
           >
-            Reply
+            View Chat
           </button>
           <button
             style={{

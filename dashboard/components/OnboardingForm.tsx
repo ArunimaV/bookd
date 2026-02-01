@@ -177,7 +177,7 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
           </div>
 
           <div style={fieldStyle}>
-            <label style={labelStyle}>Voice Agent ID</label>
+            <label style={labelStyle}>Voice Agent Name</label>
             <input
               type="text"
               name="voiceAgentId"
