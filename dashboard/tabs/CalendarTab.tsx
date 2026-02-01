@@ -7,6 +7,7 @@ import { StatusPill } from "../components/StatusPill";
 
 interface CalendarTabProps {
   appointments: Appointment[];
+  agentPhoneNumber?: string | null;
 }
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -455,7 +456,7 @@ function AppointmentList({ appointments }: AppointmentListProps) {
   );
 }
 
-export function CalendarTab({ appointments }: CalendarTabProps) {
+export function CalendarTab({ appointments, agentPhoneNumber }: CalendarTabProps) {
   const today = new Date(2026, 1, 1);
   const defaultWeekStart = getWeekStart(today);
   const [viewMode, setViewMode] = useState<CalendarViewMode>("week");
@@ -512,6 +513,7 @@ export function CalendarTab({ appointments }: CalendarTabProps) {
       <div
         style={{
           display: "flex",
+          alignItems: "center",
           gap: 16,
           marginBottom: 16,
           padding: "10px 14px",
@@ -567,6 +569,21 @@ export function CalendarTab({ appointments }: CalendarTabProps) {
           />
           <span>Cancelled</span>
         </div>
+        {agentPhoneNumber && (
+          <div
+            style={{
+              marginLeft: "auto",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            {Icons.phone(C.accent, 14)}
+            <span style={{ fontWeight: 700, color: C.text }}>
+              Agent Phone #: {agentPhoneNumber}
+            </span>
+          </div>
+        )}
       </div>
 
       {viewMode === "week" && (
