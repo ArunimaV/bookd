@@ -27,7 +27,6 @@ const UNIVERSAL_FIELDS = [
   'day',
   'month',
   'phone',
-  'email'
 ];
 
 // Split extracted fields into universal and custom
@@ -129,11 +128,6 @@ export async function POST(request: NextRequest) {
     // Split extracted fields into universal (fixed columns) and custom (JSONB)
     const { universal, custom } = splitExtractedFields(payload.extracted_fields);
 
-    // Build customer name from extracted fields or default
-    const customerName = universal.first_name
-      ? `${universal.first_name} ${universal.last_name || ''}`.trim()
-      : "New Customer";
-
     // Find or create customer by phone
     let { data: customer } = await supabase
       .from("customers")
@@ -148,7 +142,8 @@ export async function POST(request: NextRequest) {
         .from("customers")
         .insert({
           business_id: business.id,
-          name: customerName,
+          first_name: universal.first_name || "New",
+          last_name: universal.last_name || "Customer",
           phone: payload.phone,
           email: universal.email || null,
           custom_fields: custom,
@@ -158,7 +153,7 @@ export async function POST(request: NextRequest) {
 
       if (error) throw error;
       customer = newCustomer;
-    } else if (Object.keys(custom).length > 0) {
+    } else if (Object.keys(custom).length > 0 || universal.first_name) {
       // Update existing customer's custom fields (merge with existing)
       const existingCustomFields = (customer.custom_fields as Record<string, string>) || {};
       const mergedCustomFields = { ...existingCustomFields, ...custom };
@@ -166,7 +161,8 @@ export async function POST(request: NextRequest) {
       const { data: updatedCustomer, error } = await supabase
         .from("customers")
         .update({
-          name: customerName !== "New Customer" ? customerName : customer.name,
+          first_name: universal.first_name || customer.first_name,
+          last_name: universal.last_name || customer.last_name,
           email: universal.email || customer.email,
           custom_fields: mergedCustomFields,
         })
@@ -282,10 +278,15 @@ export async function POST(request: NextRequest) {
       action: "logged",
       customer_id: customer.id,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Teli webhook error:", error);
     return NextResponse.json(
-      { error: "Internal server error", details: String(error) },
+      {
+        error: "Internal server error",
+        details: error?.message || String(error),
+        code: error?.code,
+        hint: error?.hint
+      },
       { status: 500 }
     );
   }

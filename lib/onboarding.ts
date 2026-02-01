@@ -163,6 +163,25 @@ export async function getBusinessById(businessId: string) {
 }
 
 /**
+ * Get business by Supabase Auth user ID
+ */
+export async function getBusinessByUserId(userId: string) {
+  const supabase = createAdminClient()
+
+  const { data, error } = await supabase
+    .from('businesses')
+    .select('*')
+    .eq('user_id', userId)
+    .single()
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  return { success: true, business: data }
+}
+
+/**
  * Get business by agent ID (useful for webhook lookups)
  */
 export async function getBusinessByAgentId(agentId: string) {
