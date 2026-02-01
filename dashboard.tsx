@@ -1,4 +1,4 @@
-import React, { useState, Suspense, lazy, ReactNode } from "react";
+import React, { useState, useEffect, Suspense, lazy, ReactNode } from "react";
 
 // Theme & Styles
 import { C, FONT_LINK } from "./dashboard/theme";
@@ -13,6 +13,7 @@ import { LEADS, APPOINTMENTS, WEEKLY_STATS, EMPLOYEES, BUSINESS_ANALYTICS } from
 // Components
 import { Header } from "./dashboard/components/Header";
 import { StatsGrid } from "./dashboard/components/StatsGrid";
+import { OnboardingForm } from "./dashboard/components/OnboardingForm";
 
 // Types
 import type { TabId, TabDef, Lead } from "./dashboard/types";
@@ -100,12 +101,56 @@ function TabContent({ activeTab }: { activeTab: TabId }): ReactNode {
 
 export default function App(): ReactNode {
   const [activeTab, setActiveTab] = useState<TabId>("calendar");
+  const [business, setBusiness] = useState<any>(null);
+  const [checkingBusiness, setCheckingBusiness] = useState(true);
 
   const tabs = getTabDefinitions(LEADS);
+
+  // Check if business exists (using localStorage for demo)
+  useEffect(() => {
+    const savedBusiness = localStorage.getItem("teli_business");
+    if (savedBusiness) {
+      setBusiness(JSON.parse(savedBusiness));
+    }
+    setCheckingBusiness(false);
+  }, []);
+
+  const handleOnboardingComplete = (newBusiness: any) => {
+    localStorage.setItem("teli_business", JSON.stringify(newBusiness));
+    setBusiness(newBusiness);
+  };
 
   const handleTabChange = (tabId: TabId) => {
     setActiveTab(tabId);
   };
+
+  // Show loading while checking
+  if (checkingBusiness) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        background: C.bg,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: C.body,
+        color: C.textMuted
+      }}>
+        Loading...
+      </div>
+    );
+  }
+
+  // Show onboarding if no business
+  if (!business) {
+    return (
+      <>
+        <link href={FONT_LINK} rel="stylesheet" />
+        <style>{globalStyles}</style>
+        <OnboardingForm onComplete={handleOnboardingComplete} />
+      </>
+    );
+  }
 
   return (
     <>
