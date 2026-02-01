@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 120" width="380" height="120">
+  <defs>
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e8613a"/>
+      <stop offset="100%" style="stop-color:#f07a4a"/>
+    </linearGradient>
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- === ICON: Calendar, vertically centered === -->
+  <g transform="translate(20, 18)">
+    <!-- Calendar body -->
+    <rect x="0" y="12" width="56" height="52" rx="8" ry="8" fill="url(#brandGrad)" opacity="0.1"/>
+    <rect x="0" y="12" width="56" height="52" rx="8" ry="8" fill="none" stroke="url(#brandGrad)" stroke-width="3.5"/>
+
+    <!-- Calendar top bar -->
+    <rect x="0" y="12" width="56" height="16" rx="8" ry="8" fill="url(#brandGrad)"/>
+    <rect x="0" y="20" width="56" height="8" fill="url(#brandGrad)"/>
+
+    <!-- Calendar rings -->
+    <rect x="14" y="6" width="4" height="14" rx="2" fill="url(#brandGrad)"/>
+    <rect x="38" y="6" width="4" height="14" rx="2" fill="url(#brandGrad)"/>
+
+    <!-- Calendar grid dots -->
+    <circle cx="14" cy="46" r="3" fill="url(#brandGrad)" opacity="0.7"/>
+    <circle cx="28" cy="46" r="3" fill="url(#brandGrad)" opacity="0.4"/>
+    <circle cx="42" cy="46" r="3" fill="url(#brandGrad)" opacity="0.2"/>
+
+    <circle cx="14" cy="56" r="3" fill="url(#brandGrad)" opacity="0.2"/>
+    <circle cx="28" cy="56" r="3" fill="url(#brandGrad)" opacity="0.7"/>
+    <circle cx="42" cy="56" r="3" fill="url(#brandGrad)" opacity="0.4"/>
+
+    <!-- AI spark -->
+    <g filter="url(#softGlow)">
+      <polygon points="49,2 43,14 48,14 42,26 55,10 49,10 54,2" fill="#f9a07a" opacity="0.95"/>
+    </g>
+  </g>
+
+  <!-- === WORDMARK: "Bookd" vertically centered === -->
+  <text x="95" y="78" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="64" font-weight="700" fill="#3d2b1f" letter-spacing="-1">
+    <tspan>Book</tspan><tspan fill="url(#brandGrad)" font-weight="800">d</tspan>
+  </text>
+</svg>

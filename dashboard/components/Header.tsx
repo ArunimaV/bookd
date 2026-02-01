@@ -202,37 +202,17 @@ export function Header({ tabs, activeTab, onTabChange }: HeaderProps) {
               marginRight: 4,
             }}
           />
-          <div
+          {/* Replace text with logo */}
+          <img
+            src="/logo.svg"
+            alt="Bloom Studio"
             style={{
-              width: 38,
-              height: 38,
-              borderRadius: 10,
-              background: `linear-gradient(135deg, ${C.accent}, #F4A261)`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: `0 2px 8px ${C.accent}40`,
+              width: 140,
+              height: "auto",
+              display: "block",
+              marginLeft: 3, // if you want to nudge it right, adjust as needed
             }}
-          >
-            {Icons.bot("#FFF", 20)}
-          </div>
-          <div>
-            <h1
-              style={{
-                fontSize: 19,
-                fontFamily: C.heading,
-                fontWeight: 700,
-                color: C.text,
-                lineHeight: 1.2,
-                margin: 0,
-              }}
-            >
-              Bloom Studio
-            </h1>
-            <p style={{ fontSize: 12, color: C.textMuted, margin: 0 }}>
-              Powered by Teli + OpenClaw
-            </p>
-          </div>
+          />
         </div>
 
         {/* Status Indicator */}
