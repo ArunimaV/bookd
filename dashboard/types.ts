@@ -4,7 +4,7 @@ export type LeadStatus = "new" | "in_progress" | "handled" | "urgent";
 export type AppointmentStatus = "confirmed" | "pending" | "reminder_sent" | "cancelled";
 export type Channel = "call" | "text";
 export type AllStatus = LeadStatus | AppointmentStatus;
-export type TabId = "inbox" | "calendar" | "leads" | "business_analytics" | "your_agent";
+export type TabId = "inbox" | "calendar" | "leads" | "business_analytics" | "your_agent" | "profile";
 export type InboxFilter = "all" | "new" | "replied" | "urgent";
 
 export interface Lead {

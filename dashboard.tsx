@@ -45,6 +45,9 @@ const BusinessAnalyticsTab = lazy(() =>
 const YourAgentTab = lazy(() =>
   import("./dashboard/tabs/YourAgentTab").then((m) => ({ default: m.YourAgentTab }))
 );
+const ProfileTab = lazy(() =>
+  import("./dashboard/tabs/ProfileTab").then((m) => ({ default: m.ProfileTab }))
+);
 
 // Loading fallback component
 function TabLoadingFallback() {
@@ -98,6 +101,12 @@ function getTabDefinitions(leads: Lead[]): TabDef[] {
       icon: (c?: string, s?: number) => <HiSparkles size={s || 20} color={c || "#6B5D4D"} />,
       count: null,
     },
+    {
+      id: "profile",
+      label: "Profile",
+      icon: Icons.user,
+      count: null,
+    },
   ];
 }
 
@@ -105,10 +114,11 @@ function getTabDefinitions(leads: Lead[]): TabDef[] {
 interface TabContentProps {
   activeTab: TabId;
   business?: any;
+  user?: any;
   onBusinessUpdate?: (business: any) => void;
 }
 
-function TabContent({ activeTab, business, onBusinessUpdate }: TabContentProps): ReactNode {
+function TabContent({ activeTab, business, user, onBusinessUpdate }: TabContentProps): ReactNode {
   return (
     <Suspense fallback={<TabLoadingFallback />}>
       {activeTab === "inbox" && <InboxTab leads={LEADS} />}
@@ -124,6 +134,9 @@ function TabContent({ activeTab, business, onBusinessUpdate }: TabContentProps):
       {activeTab === "your_agent" && business && onBusinessUpdate && (
         <YourAgentTab business={business} onBusinessUpdate={onBusinessUpdate} />
       )}
+      {activeTab === "profile" && business && (
+        <ProfileTab business={business} user={user} />
+      )}
     </Suspense>
   );
 }
@@ -135,6 +148,7 @@ const TAB_TO_URL: Record<TabId, string> = {
   leads: "/leads",
   business_analytics: "/analytics",
   your_agent: "/agent",
+  profile: "/profile",
 };
 
 interface AppProps {
@@ -328,6 +342,7 @@ export default function App({ defaultTab = "calendar" }: AppProps): ReactNode {
           <TabContent
             activeTab={activeTab}
             business={business}
+            user={user}
             onBusinessUpdate={setBusiness}
           />
         </div>
