@@ -8,9 +8,15 @@ Business owners sign up, configure a custom AI voice agent (personality, greetin
 
 ## Tech Stack
 
-- **Next.js 14** (App Router) + **TypeScript**
-- **Supabase** (PostgreSQL, Auth, Row-Level Security)
-- **Teli AI** (Voice agent + phone provisioning)
+- **Next.js 14** -- React framework with App Router for file-based routing
+- **TypeScript** -- Type-safe development
+- **React 18** -- UI library with lazy loading and Suspense
+- **Supabase** -- PostgreSQL database, Auth (email + password), Row-Level Security, SSR cookie handling
+- **@supabase/ssr** -- Server-side rendering integration for Supabase Auth
+- **Teli AI** -- Voice agent creation, phone number provisioning, call data API
+- **Modal** -- Teli API deployment infrastructure
+- **React Icons** -- Icon library
+- **Google Fonts** -- Fraunces (headings) and Nunito (body) typefaces
 
 ## Features
 
