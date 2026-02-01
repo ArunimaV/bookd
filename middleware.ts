@@ -42,8 +42,11 @@ export async function middleware(request: NextRequest) {
   // Use getSession for faster check (doesn't make API call)
   const { data: { session } } = await supabase.auth.getSession()
 
+  // Public routes that don't require authentication
+  const publicRoutes = ['/', '/login']
+  
   // If not authenticated and trying to access protected routes, redirect to login
-  if (!session && pathname !== '/login') {
+  if (!session && !publicRoutes.includes(pathname)) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
