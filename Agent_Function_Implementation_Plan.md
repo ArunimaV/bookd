@@ -169,7 +169,7 @@ export async function createUser(params: CreateUserParams): Promise<TeliUser> {
   const { name, email, permission = 'admin' } = params;
   
   const response = await fetch(
-    `${API_URL}/v1/organizations/${ORGANIZATION_ID}/users`,
+    `${TELI_API_URL}/v1/organizations/${ORGANIZATION_ID}/users`,
     {
       method: 'POST',
       headers: getHeaders(),
@@ -205,7 +205,7 @@ export async function createPhoneNumber(params: CreatePhoneNumberParams): Promis
   const { areaCode, userId, tenantId } = params;
   
   const response = await fetch(
-    `${API_URL}/v1/voice/phone-numbers/create`,
+    `${TELI_API_URL}/v1/voice/phone-numbers/create`,
     {
       method: 'POST',
       headers: getHeaders(),
@@ -270,7 +270,7 @@ export async function createVoiceAgent(params: CreateVoiceAgentParams): Promise<
     extraction_fields: extractionFields
   };
 
-  const response = await fetch(`${API_URL}/v1/agents`, {
+  const response = await fetch(`${TELI_API_URL}/v1/agents`, {
     method: 'POST',
     headers: getHeaders(),
     body: JSON.stringify(payload)
@@ -301,7 +301,7 @@ export async function attachAgentToPhone(params: AttachAgentParams): Promise<boo
   const { phoneNumber, inboundAgentId } = params;
   
   const response = await fetch(
-    `${API_URL}/v1/voice/phone-numbers/${phoneNumber}/update-agent`,
+    `${TELI_API_URL}/v1/voice/phone-numbers/${phoneNumber}/update-agent`,
     {
       method: 'POST',
       headers: getHeaders(),

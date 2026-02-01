@@ -73,15 +73,15 @@ function extractTranscript(payload: any): string | undefined {
 }
 
 export async function fetchCallTranscript(callId: string): Promise<string | undefined> {
-  const apiUrl = process.env.API_URL
+  const apiUrl = process.env.TELI_API_URL
   const apiKey = process.env.TELI_API_KEY
 
   console.log('[fetchCallTranscript] Starting for callId:', callId)
-  console.log('[fetchCallTranscript] API_URL:', apiUrl || 'NOT SET')
+  console.log('[fetchCallTranscript] TELI_API_URL:', apiUrl || 'NOT SET')
   console.log('[fetchCallTranscript] TELI_API_KEY:', apiKey ? `${apiKey.slice(0, 10)}...` : 'NOT SET')
 
   if (!apiUrl || !apiKey) {
-    console.error('[fetchCallTranscript] MISSING ENV VARS - API_URL:', !!apiUrl, 'TELI_API_KEY:', !!apiKey)
+    console.error('[fetchCallTranscript] MISSING ENV VARS - TELI_API_URL:', !!apiUrl, 'TELI_API_KEY:', !!apiKey)
     return undefined
   }
 
