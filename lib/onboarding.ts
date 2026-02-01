@@ -9,6 +9,7 @@ export interface OnboardingInputs {
   // User/Owner Info
   ownerEmail: string          // Required - unique identifier for the user
   ownerName?: string          // Optional - for display purposes
+  userId?: string             // Optional - Supabase Auth user ID (if authenticated)
 
   // Organization Info
   orgName: string             // Required - business name (e.g., "Bloom Studio")
@@ -48,8 +49,8 @@ export interface OnboardingInputs {
 export async function completeOnboarding(inputs: OnboardingInputs) {
   const supabase = createAdminClient()
 
-  // Generate user_id (UUID) for the business/user
-  const userId = crypto.randomUUID()
+  // Use auth user ID if provided, otherwise generate one
+  const userId = inputs.userId || crypto.randomUUID()
 
   // Create slug from org name
   const slug = inputs.orgName
@@ -82,7 +83,7 @@ export async function completeOnboarding(inputs: OnboardingInputs) {
       owner_email: inputs.ownerEmail,
       name: inputs.orgName,
       business_name: slug,
-      teli_phone_number: inputs.phoneNumber,
+      login_phone_number: inputs.phoneNumber,
       teli_agent_id: inputs.voiceAgentId,
       timezone: inputs.timezone || 'America/New_York',
       work_hours: inputs.workHours || defaultWorkHours,
@@ -152,6 +153,25 @@ export async function getBusinessByEmail(ownerEmail: string) {
     .from('businesses')
     .select('*')
     .eq('owner_email', ownerEmail)
+    .single()
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  return { success: true, business: data }
+}
+
+/**
+ * Get business by Supabase Auth user ID
+ */
+export async function getBusinessByUserId(userId: string) {
+  const supabase = createAdminClient()
+
+  const { data, error } = await supabase
+    .from('businesses')
+    .select('*')
+    .eq('user_id', userId)
     .single()
 
   if (error) {
