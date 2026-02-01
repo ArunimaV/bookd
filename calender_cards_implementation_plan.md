@@ -7,13 +7,32 @@
 
 ## Overview
 
-This plan covers two main features:
-1. **Sync customers from Supabase** when clicking the "Sync Now" button, filtering by the business's `business_name`
-2. **Clickable customer cards** on the calendar that display a popup modal with customer details and custom_fields answers
+This plan covers three main objectives:
+1. **Remove mock data** currently hardcoded in `dashboard/data.ts` and replace with real Supabase data
+2. **Sync customers from Supabase** when clicking the "Sync Now" button, filtering by matching `business_name` column
+3. **Clickable customer cards** on the calendar that display a popup modal with customer details and custom_fields answers
 
 ---
 
 ## Current State Analysis
+
+### Mock Data to Remove
+
+**File: `dashboard/data.ts`** contains hardcoded mock data that must be replaced:
+
+| Export | Description | Replacement |
+|--------|-------------|-------------|
+| `LEADS` | 6 fake lead entries | Fetch from `customers` table |
+| `APPOINTMENTS` | 10 fake appointments | Fetch from `appointments` table |
+| `EMPLOYEES` | 3 fake employee names | Fetch from business settings or remove |
+| `BUSINESS_ANALYTICS` | Fake stats | Calculate from real data |
+| `WEEKLY_STATS` | Fake weekly numbers | Calculate from real data |
+
+**Current usage in `dashboard.tsx`:**
+```typescript
+// These imports need to be replaced with real data fetching:
+import { LEADS, APPOINTMENTS, WEEKLY_STATS, EMPLOYEES, BUSINESS_ANALYTICS } from "./dashboard/data";
+```
 
 ### Existing Components
 
@@ -25,7 +44,7 @@ This plan covers two main features:
 | `/api/customers` | `app/api/customers/route.ts` | CRUD operations for customers |
 | `/api/teli/sync` | `app/api/teli/sync/route.ts` | Sync calls from Teli to Supabase |
 
-### Database Schema (Relevant Tables)
+### Database Schema (Current State)
 
 **businesses table:**
 ```sql
@@ -37,7 +56,7 @@ This plan covers two main features:
 - ...
 ```
 
-**customers table:**
+**customers table (CURRENT - needs migration):**
 ```sql
 - id uuid
 - created_at timestamptz
@@ -47,8 +66,10 @@ This plan covers two main features:
 - email text
 - notes text
 - last_appointment timestamptz
-- custom_fields jsonb    -- e.g., {"hair_style": "fade", "barber": "no preference"}
+- custom_fields jsonb
 ```
+
+**⚠️ Problem:** The `customers` table currently uses `business_id` (UUID FK) but we need to match by `business_name` (text slug).
 
 **custom_field_definitions table:**
 ```sql
@@ -65,7 +86,27 @@ This plan covers two main features:
 
 1. User clicks "Sync Now" → `useTeliSync.syncNow()` → `/api/teli/sync` POST
 2. API pulls calls from Teli, creates customers in `customers` table
-3. Customers are linked via `business_id` (FK relationship)
+3. Currently customers are linked via `business_id` (FK relationship)
+4. **Calendar still displays mock `APPOINTMENTS` data, not real customers**
+
+---
+
+## Part 0: Remove Mock Data
+
+### Files to Modify
+
+| File | Change |
+|------|--------|
+| `dashboard.tsx` | Remove imports from `data.ts`, use hooks for real data |
+| `dashboard/data.ts` | Delete file entirely OR keep only type examples |
+
+### Steps
+
+1. Create hooks to fetch real data from Supabase
+2. Replace `APPOINTMENTS` with data from `appointments` table
+3. Replace `LEADS` with data from `customers` table  
+4. Calculate `WEEKLY_STATS` and `BUSINESS_ANALYTICS` from real data
+5. Remove or deprecate `dashboard/data.ts`
 
 ---
 
@@ -73,23 +114,123 @@ This plan covers two main features:
 
 ### Problem Statement
 
-The user wants to fetch customers that match the logged-in business's `business_name`. Currently, customers are linked via `business_id` (UUID foreign key). We need to clarify the matching strategy:
+The user wants to fetch customers that match the logged-in business's `business_name`. Currently, customers are linked via `business_id` (UUID foreign key), but we need to support matching by `business_name` text column.
 
-**Option A:** Use existing `business_id` FK relationship (recommended)
-- Customers already have `business_id` linking to `businesses.id`
-- No schema changes needed
+### Required Approach: Add `business_name` Column
 
-**Option B:** Add `business_name` column to customers table
-- Requires schema migration
-- Allows matching by slug instead of UUID
+Since the requirement is to match customers by `business_name`, we need to:
+1. Add a `business_name` column to the `customers` table
+2. Update the sync process to populate this column
+3. Query customers by matching `business_name`
 
-### Recommended Approach: Option A
+### Schema Migration
 
-Use the existing `business_id` relationship since it's already in place and more robust.
+**Run this SQL in Supabase SQL Editor:**
+
+```sql
+-- Add business_name column to customers table
+ALTER TABLE customers 
+ADD COLUMN IF NOT EXISTS business_name text;
+
+-- Create index for fast lookups by business_name
+CREATE INDEX IF NOT EXISTS idx_customers_business_name 
+ON customers(business_name);
+
+-- Optional: Backfill existing customers with business_name from their business
+UPDATE customers c
+SET business_name = b.business_name
+FROM businesses b
+WHERE c.business_id = b.id
+AND c.business_name IS NULL;
+```
+
+### Updated Customers Table Schema
+
+```sql
+-- customers table (AFTER migration)
+- id uuid
+- created_at timestamptz
+- business_id uuid          -- FK to businesses(id) - keep for referential integrity
+- business_name text        -- NEW: Slug for matching (e.g., "bloom-studio")
+- name text
+- phone text
+- email text
+- notes text
+- last_appointment timestamptz
+- custom_fields jsonb
+```
 
 ### Implementation Steps
 
-#### 1. Create Customer Fetch Hook
+#### 1. Update Customers API to Support business_name Query
+
+**File: `app/api/customers/route.ts`**
+
+Update the GET endpoint to support querying by `business_name`:
+
+```typescript
+import { NextRequest, NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/server";
+
+// GET /api/customers - List customers
+export async function GET(request: NextRequest) {
+  const supabase = createAdminClient();
+  const { searchParams } = new URL(request.url);
+  
+  const businessId = searchParams.get("business_id");
+  const businessName = searchParams.get("business_name"); // NEW: Support business_name
+  const search = searchParams.get("search");
+
+  let query = supabase
+    .from("customers")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  // Filter by business_name (preferred) or business_id
+  if (businessName) {
+    query = query.eq("business_name", businessName);
+  } else if (businessId) {
+    query = query.eq("business_id", businessId);
+  }
+
+  if (search) {
+    query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%`);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json(data);
+}
+```
+
+#### 2. Update Teli Sync to Populate business_name
+
+**File: `lib/teli.ts`** (or wherever `pullAndSyncCalls` is defined)
+
+When creating/updating customers during sync, include the `business_name`:
+
+```typescript
+// When inserting a new customer during sync:
+const { data: business } = await supabase
+  .from("businesses")
+  .select("id, business_name")
+  .eq("id", businessId)
+  .single();
+
+const customerData = {
+  business_id: businessId,
+  business_name: business.business_name, // NEW: Include business_name
+  name: extractedName,
+  phone: phoneNumber,
+  // ... other fields
+};
+```
+
+#### 3. Create Customer Fetch Hook (using business_name)
 
 **New file: `dashboard/hooks/useCustomers.ts`**
 
@@ -99,6 +240,7 @@ import { useState, useEffect, useCallback } from 'react';
 export interface Customer {
   id: string;
   business_id: string;
+  business_name: string;  // NEW: Added business_name
   name: string;
   phone: string;
   email: string | null;
@@ -109,7 +251,7 @@ export interface Customer {
 }
 
 interface UseCustomersOptions {
-  businessId: string | undefined;
+  businessName: string | undefined;  // CHANGED: Use businessName instead of businessId
   enabled?: boolean;
 }
 
@@ -120,8 +262,11 @@ interface UseCustomersReturn {
   refetch: () => Promise<void>;
 }
 
+/**
+ * Hook to fetch customers from Supabase by business_name
+ */
 export function useCustomers({ 
-  businessId, 
+  businessName,  // Match by business_name column
   enabled = true 
 }: UseCustomersOptions): UseCustomersReturn {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -129,14 +274,15 @@ export function useCustomers({
   const [error, setError] = useState<string | null>(null);
 
   const fetchCustomers = useCallback(async () => {
-    if (!businessId || !enabled) {
+    if (!businessName || !enabled) {
       setLoading(false);
       return;
     }
 
     try {
       setLoading(true);
-      const response = await fetch(`/api/customers?business_id=${businessId}`);
+      // Query by business_name instead of business_id
+      const response = await fetch(`/api/customers?business_name=${encodeURIComponent(businessName)}`);
       const data = await response.json();
 
       if (Array.isArray(data)) {
@@ -150,7 +296,7 @@ export function useCustomers({
     } finally {
       setLoading(false);
     }
-  }, [businessId, enabled]);
+  }, [businessName, enabled]);
 
   useEffect(() => {
     fetchCustomers();
@@ -788,26 +934,36 @@ export function CalendarTab({
 
 ### File: `dashboard.tsx`
 
-#### 1. Add Customer Hook Usage
+#### 1. Remove Mock Data Imports
 
 ```typescript
-// Add import
-import { useCustomers } from "./dashboard/hooks/useCustomers";
+// REMOVE these imports:
+// import { LEADS, APPOINTMENTS, WEEKLY_STATS, EMPLOYEES, BUSINESS_ANALYTICS } from "./dashboard/data";
 
+// ADD these hook imports:
+import { useCustomers } from "./dashboard/hooks/useCustomers";
+import { useAppointments } from "./dashboard/hooks/useAppointments"; // Create this hook
+```
+
+#### 2. Add Customer Hook Usage (with business_name)
+
+```typescript
 // Inside App component:
+
+// Fetch customers by business_name (not business_id)
 const { 
   customers, 
   loading: customersLoading, 
   refetch: refetchCustomers 
 } = useCustomers({
-  businessId: business?.id,
+  businessName: business?.business_name,  // Use business_name for matching
   enabled: !!business,
 });
 
 // Update handleSyncNow to refetch customers after sync:
 const handleSyncNow = async () => {
   await syncNow();
-  await refetchCustomers();
+  await refetchCustomers();  // Refresh customer list from Supabase
 };
 
 // Update handleSyncAll similarly:
@@ -817,24 +973,118 @@ const handleSyncAll = async () => {
 };
 ```
 
-#### 2. Update TabContent to Pass Data
+#### 3. Update TabContent to Use Real Data
 
 ```typescript
-function TabContent({ activeTab, business, customers, onBusinessUpdate }: TabContentProps): ReactNode {
+// Update TabContentProps to include customers
+interface TabContentProps {
+  activeTab: TabId;
+  business?: any;
+  customers: Customer[];  // Real customers from Supabase
+  appointments: Appointment[];  // Real appointments from Supabase (TODO: create hook)
+  onBusinessUpdate?: (business: any) => void;
+}
+
+function TabContent({ 
+  activeTab, 
+  business, 
+  customers,
+  appointments,
+  onBusinessUpdate 
+}: TabContentProps): ReactNode {
   return (
     <Suspense fallback={<TabLoadingFallback />}>
-      {activeTab === "inbox" && <InboxTab leads={LEADS} />}
+      {activeTab === "inbox" && <InboxTab leads={customers} />}  {/* Use real customers */}
       {activeTab === "calendar" && (
         <CalendarTab 
-          appointments={APPOINTMENTS} 
-          customers={customers}
-          businessId={business?.id}
+          appointments={appointments}  // Use real appointments
+          customers={customers}        // Pass real customers
+          businessName={business?.business_name}
           agentPhoneNumber={business?.teli_phone_number || null} 
+        />
+      )}
+      {activeTab === "business_analytics" && (
+        <BusinessAnalyticsTab
+          analytics={calculateAnalytics(customers, appointments)}  // Calculate from real data
+          appointments={appointments}
+          employees={business?.employees || []}
         />
       )}
       {/* ... rest of tabs */}
     </Suspense>
   );
+}
+
+// Helper to calculate analytics from real data
+function calculateAnalytics(customers: Customer[], appointments: Appointment[]): BusinessAnalytics {
+  const now = new Date();
+  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+  return {
+    totalClients: customers.length,
+    clientsThisWeek: customers.filter(c => new Date(c.created_at) >= weekAgo).length,
+    clientsLastWeek: customers.filter(c => {
+      const created = new Date(c.created_at);
+      return created >= twoWeeksAgo && created < weekAgo;
+    }).length,
+    cancellationsThisWeek: appointments.filter(a => 
+      a.status === 'cancelled' && new Date(a.date) >= weekAgo
+    ).length,
+  };
+}
+```
+
+#### 4. Create Appointments Hook (Similar Pattern)
+
+**New file: `dashboard/hooks/useAppointments.ts`**
+
+```typescript
+import { useState, useEffect, useCallback } from 'react';
+import type { Appointment } from '../types';
+
+interface UseAppointmentsOptions {
+  businessName: string | undefined;
+  enabled?: boolean;
+}
+
+export function useAppointments({ 
+  businessName, 
+  enabled = true 
+}: UseAppointmentsOptions) {
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchAppointments = useCallback(async () => {
+    if (!businessName || !enabled) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/appointments?business_name=${encodeURIComponent(businessName)}`);
+      const data = await response.json();
+
+      if (Array.isArray(data)) {
+        setAppointments(data);
+        setError(null);
+      } else if (data.error) {
+        setError(data.error);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch appointments');
+    } finally {
+      setLoading(false);
+    }
+  }, [businessName, enabled]);
+
+  useEffect(() => {
+    fetchAppointments();
+  }, [fetchAppointments]);
+
+  return { appointments, loading, error, refetch: fetchAppointments };
 }
 ```
 
@@ -842,11 +1092,20 @@ function TabContent({ activeTab, business, customers, onBusinessUpdate }: TabCon
 
 ## File Structure Summary
 
+### Database Changes
+
+| Change | Description |
+|--------|-------------|
+| `customers` table | Add `business_name` column (text) |
+| Index | Add `idx_customers_business_name` index |
+| Backfill | Update existing customers with `business_name` from linked business |
+
 ### New Files to Create
 
 | File | Purpose |
 |------|---------|
-| `dashboard/hooks/useCustomers.ts` | Hook to fetch customers from API |
+| `dashboard/hooks/useCustomers.ts` | Hook to fetch customers by `business_name` |
+| `dashboard/hooks/useAppointments.ts` | Hook to fetch real appointments from Supabase |
 | `dashboard/components/CustomerCard.tsx` | Clickable customer card component |
 | `dashboard/components/CustomerDetailModal.tsx` | Modal showing customer details + custom_fields |
 | `app/api/custom-fields/route.ts` | API endpoint for custom field definitions |
@@ -855,20 +1114,37 @@ function TabContent({ activeTab, business, customers, onBusinessUpdate }: TabCon
 
 | File | Changes |
 |------|---------|
+| `app/api/customers/route.ts` | Add support for `business_name` query parameter |
+| `lib/teli.ts` (or sync logic) | Populate `business_name` when creating customers |
 | `dashboard/tabs/CalendarTab.tsx` | Add customers sidebar, integrate modal |
-| `dashboard.tsx` | Add `useCustomers` hook, pass customers to CalendarTab |
-| `dashboard/types.ts` | Add `Customer` type if not using hook's export |
+| `dashboard.tsx` | Remove mock imports, use real data hooks with `business_name` |
+| `dashboard/types.ts` | Add `Customer` type with `business_name` field |
 | `dashboard/components/index.ts` | Export new components |
-| `dashboard/hooks/index.ts` | Export `useCustomers` hook |
+| `dashboard/hooks/index.ts` | Export new hooks |
+
+### Files to Delete/Deprecate
+
+| File | Action |
+|------|--------|
+| `dashboard/data.ts` | DELETE - Contains mock `LEADS`, `APPOINTMENTS`, etc. |
 
 ---
 
 ## Implementation Checklist
 
-### Phase 1: Data Layer
-- [ ] Create `dashboard/hooks/useCustomers.ts` hook
+### Phase 0: Schema Migration & Mock Data Removal
+- [ ] Run SQL migration to add `business_name` column to `customers` table
+- [ ] Backfill existing customers with `business_name` from their linked business
+- [ ] Update Teli sync process to populate `business_name` when creating customers
+- [ ] Remove/deprecate `dashboard/data.ts` mock data file
+- [ ] Remove mock data imports from `dashboard.tsx`
+
+### Phase 1: Data Layer (Real Data from Supabase)
+- [ ] Update `/api/customers` route to support `business_name` query parameter
+- [ ] Create `dashboard/hooks/useCustomers.ts` hook (queries by `business_name`)
+- [ ] Create `dashboard/hooks/useAppointments.ts` hook (for real appointments)
 - [ ] Create `/api/custom-fields` endpoint in `app/api/custom-fields/route.ts`
-- [ ] Export hook from `dashboard/hooks/index.ts`
+- [ ] Export hooks from `dashboard/hooks/index.ts`
 
 ### Phase 2: UI Components
 - [ ] Create `dashboard/components/CustomerCard.tsx`
@@ -876,18 +1152,21 @@ function TabContent({ activeTab, business, customers, onBusinessUpdate }: TabCon
 - [ ] Export components from `dashboard/components/index.ts`
 
 ### Phase 3: Integration
-- [ ] Update `CalendarTab` props to accept `customers` and `businessId`
+- [ ] Update `CalendarTab` props to accept `customers` and `businessName`
 - [ ] Add customer sidebar to `CalendarTab`
 - [ ] Integrate `CustomerDetailModal` in `CalendarTab`
-- [ ] Update `dashboard.tsx` to use `useCustomers` hook
-- [ ] Pass customers data to `CalendarTab` in `TabContent`
-- [ ] Update sync handlers to refetch customers
+- [ ] Update `dashboard.tsx` to use `useCustomers` hook with `business_name`
+- [ ] Update `dashboard.tsx` to use `useAppointments` hook (replace mock APPOINTMENTS)
+- [ ] Pass real customers/appointments to `CalendarTab` in `TabContent`
+- [ ] Update sync handlers to refetch customers after sync
+- [ ] Update `BusinessAnalyticsTab` to calculate stats from real data
 
 ### Phase 4: Polish
 - [ ] Add loading state for customers sidebar
 - [ ] Add search/filter for customers list
 - [ ] Add responsive styles for sidebar (collapse on mobile)
 - [ ] Add animations and transitions
+- [ ] Handle empty states (no customers yet, sync to get started)
 
 ---
 

@@ -7,6 +7,10 @@ export { StatCard } from "./StatCard";
 export { LeadCard } from "./LeadCard";
 export { LeadDetail } from "./LeadDetail";
 
+// Customer Components
+export { CustomerCard } from "./CustomerCard";
+export { CustomerDetailModal } from "./CustomerDetailModal";
+
 // Layout Components
 export { Header } from "./Header";
 export { TabNav } from "./TabNav";
