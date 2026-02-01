@@ -10,8 +10,8 @@ import { globalStyles } from "./dashboard/styles";
 // Icons
 import { Icons } from "./dashboard/icons";
 
-// Data
-import { LEADS, APPOINTMENTS, WEEKLY_STATS, EMPLOYEES, BUSINESS_ANALYTICS } from "./dashboard/data";
+// Data (TODO: Replace remaining mock data with real Supabase data)
+import { LEADS, WEEKLY_STATS, EMPLOYEES, BUSINESS_ANALYTICS } from "./dashboard/data";
 
 // Components
 import { Header } from "./dashboard/components/Header";
@@ -25,9 +25,11 @@ import { SyncAllButton } from "./dashboard/components/SyncAllButton";
 import { useNewCalls } from "./dashboard/hooks/useNewCalls";
 import { useTeliSync } from "./dashboard/hooks/useTeliSync";
 import { useSyncAll } from "./dashboard/hooks/useSyncAll";
+import { useCustomers, getAppointmentsFromCustomers } from "./dashboard/hooks/useCustomers";
+import type { Customer } from "./dashboard/hooks/useCustomers";
 
 // Types
-import type { TabId, TabDef, Lead } from "./dashboard/types";
+import type { TabId, TabDef, Lead, Appointment } from "./dashboard/types";
 
 // Lazy load tab components for code splitting
 const InboxTab = lazy(() =>
@@ -115,19 +117,44 @@ interface TabContentProps {
   activeTab: TabId;
   business?: any;
   user?: any;
+  customers?: Customer[];
+  customersLoading?: boolean;
+  customersError?: string | null;
+  appointments?: Appointment[];
+  appointmentsLoading?: boolean;
   onBusinessUpdate?: (business: any) => void;
 }
 
-function TabContent({ activeTab, business, user, onBusinessUpdate }: TabContentProps): ReactNode {
+function TabContent({ 
+  activeTab, 
+  business, 
+  user, 
+  customers = [], 
+  customersLoading = false,
+  customersError = null,
+  appointments = [],
+  appointmentsLoading = false,
+  onBusinessUpdate 
+}: TabContentProps): ReactNode {
   return (
     <Suspense fallback={<TabLoadingFallback />}>
       {activeTab === "inbox" && <InboxTab leads={LEADS} />}
-      {activeTab === "calendar" && <CalendarTab appointments={APPOINTMENTS} agentPhoneNumber={business?.teli_phone_number || null} />}
+      {activeTab === "calendar" && (
+        <CalendarTab 
+          appointments={appointments}
+          appointmentsLoading={appointmentsLoading}
+          customers={customers}
+          customersLoading={customersLoading}
+          customersError={customersError}
+          businessId={business?.id}
+          agentPhoneNumber={business?.teli_phone_number || null} 
+        />
+      )}
       {activeTab === "leads" && <LeadsTab leads={LEADS} />}
       {activeTab === "business_analytics" && (
         <BusinessAnalyticsTab
           analytics={BUSINESS_ANALYTICS}
-          appointments={APPOINTMENTS}
+          appointments={appointments}
           employees={EMPLOYEES}
         />
       )}
@@ -190,16 +217,36 @@ export default function App({ defaultTab = "calendar" }: AppProps): ReactNode {
     syncAll,
   } = useSyncAll();
 
-  // When sync completes, refetch customers to show new data
+  // Fetch customers by business_name from Supabase
+  const { 
+    customers, 
+    loading: customersLoading,
+    error: customersError,
+    refetch: refetchCustomersByName 
+  } = useCustomers({
+    businessName: business?.business_name,
+    enabled: !!business?.business_name,
+  });
+
+  // Derive appointments from customers who have appointment data
+  const appointments = useMemo(() => {
+    return getAppointmentsFromCustomers(customers);
+  }, [customers]);
+  
+  const appointmentsLoading = customersLoading; // Same loading state as customers
+
+  // When sync completes, refetch customers (appointments are derived from customers)
   const handleSyncNow = async () => {
     await syncNow();
     refetchCustomers();
+    refetchCustomersByName();
   };
 
   // When sync all completes, refetch customers
   const handleSyncAll = async () => {
     await syncAll();
     refetchCustomers();
+    refetchCustomersByName();
   };
 
   // Check auth session and fetch business
@@ -343,6 +390,11 @@ export default function App({ defaultTab = "calendar" }: AppProps): ReactNode {
             activeTab={activeTab}
             business={business}
             user={user}
+            customers={customers}
+            customersLoading={customersLoading}
+            customersError={customersError}
+            appointments={appointments}
+            appointmentsLoading={appointmentsLoading}
             onBusinessUpdate={setBusiness}
           />
         </div>

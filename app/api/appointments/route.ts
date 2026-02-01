@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     .from("appointments")
     .select(`
       *,
-      customer:customers(id, name, phone, email)
+      customer:customers(id, first_name, last_name, phone_number, email)
     `)
     .order("start_time", { ascending: true });
 
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     .insert(body)
     .select(`
       *,
-      customer:customers(id, name, phone, email)
+      customer:customers(id, first_name, last_name, phone_number, email)
     `)
     .single();
 

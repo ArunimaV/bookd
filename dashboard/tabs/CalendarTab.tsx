@@ -1,12 +1,20 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { C } from "../theme";
 import { Icons } from "../icons";
 import type { Appointment } from "../types";
+import type { Customer } from "../hooks/useCustomers";
 import { Avatar } from "../components/Avatar";
 import { StatusPill } from "../components/StatusPill";
+import { CustomerCard } from "../components/CustomerCard";
+import { CustomerDetailModal } from "../components/CustomerDetailModal";
 
 interface CalendarTabProps {
   appointments: Appointment[];
+  appointmentsLoading?: boolean;
+  customers?: Customer[];
+  customersLoading?: boolean;
+  customersError?: string | null;
+  businessId?: string;
   agentPhoneNumber?: string | null;
 }
 
@@ -456,14 +464,38 @@ function AppointmentList({ appointments }: AppointmentListProps) {
   );
 }
 
-export function CalendarTab({ appointments, agentPhoneNumber }: CalendarTabProps) {
+export function CalendarTab({ 
+  appointments, 
+  appointmentsLoading = false,
+  customers = [], 
+  customersLoading = false,
+  customersError = null,
+  businessId,
+  agentPhoneNumber 
+}: CalendarTabProps) {
   const today = new Date(2026, 1, 1);
   const defaultWeekStart = getWeekStart(today);
   const [viewMode, setViewMode] = useState<CalendarViewMode>("week");
   const [focusDate, setFocusDate] = useState(defaultWeekStart);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const weekStart = viewMode === "week" ? getWeekStart(focusDate) : focusDate;
   const days = getWeekDays(weekStart);
+
+  // Filter customers based on search
+  const filteredCustomers = useMemo(() => {
+    if (!searchQuery.trim()) return customers;
+    const query = searchQuery.toLowerCase();
+    return customers.filter((customer) => {
+      const fullName = `${customer.first_name} ${customer.last_name}`.toLowerCase();
+      return (
+        fullName.includes(query) ||
+        customer.phone_number.includes(query) ||
+        (customer.email && customer.email.toLowerCase().includes(query))
+      );
+    });
+  }, [customers, searchQuery]);
 
   const getAppointmentsForDate = (date: Date): Appointment[] => {
     const dateStr = formatDateString(date);
@@ -500,122 +532,294 @@ export function CalendarTab({ appointments, agentPhoneNumber }: CalendarTabProps
   };
 
   return (
-    <div style={{ animation: "fadeIn 0.4s ease" }}>
-      <CalendarToolbar
-        viewMode={viewMode}
-        onViewModeChange={handleViewModeChange}
-        onPrev={handlePrev}
-        onNext={handleNext}
-        onToday={handleToday}
-      />
+    <div style={{ display: "flex", gap: 24, animation: "fadeIn 0.4s ease" }}>
+      {/* Main Calendar Section */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <CalendarToolbar
+          viewMode={viewMode}
+          onViewModeChange={handleViewModeChange}
+          onPrev={handlePrev}
+          onNext={handleNext}
+          onToday={handleToday}
+        />
 
-      {/* Status Legend */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 16,
-          marginBottom: 16,
-          padding: "10px 14px",
-          background: C.card,
-          border: `1px solid ${C.border}`,
-          borderRadius: 10,
-          fontSize: 12,
-          color: C.textSoft,
-          flexWrap: "wrap",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div
-            style={{
-              width: 12,
-              height: 12,
-              borderRadius: 3,
-              background: C.green,
-            }}
-          />
-          <span>Confirmed</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div
-            style={{
-              width: 12,
-              height: 12,
-              borderRadius: 3,
-              background: C.yellow,
-            }}
-          />
-          <span>Pending</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div
-            style={{
-              width: 12,
-              height: 12,
-              borderRadius: 3,
-              background: C.blue,
-            }}
-          />
-          <span>Reminded</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div
-            style={{
-              width: 12,
-              height: 12,
-              borderRadius: 3,
-              background: C.red,
-            }}
-          />
-          <span>Cancelled</span>
-        </div>
-        {agentPhoneNumber && (
-          <div
-            style={{
-              marginLeft: "auto",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            {Icons.phone(C.accent, 14)}
-            <span style={{ fontWeight: 700, color: C.text }}>
-              Agent Phone #: {agentPhoneNumber}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {viewMode === "week" && (
+        {/* Status Legend */}
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(7, 1fr)",
-            gap: 12,
-            minHeight: "min(560px, 72vh)",
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+            marginBottom: 16,
+            padding: "10px 14px",
+            background: C.card,
+            border: `1px solid ${C.border}`,
+            borderRadius: 10,
+            fontSize: 12,
+            color: C.textSoft,
+            flexWrap: "wrap",
           }}
         >
-          {days.map((date, index) => (
-            <DayCard
-              key={index}
-              date={date}
-              isToday={isSameDay(date, today)}
-              dayIndex={index}
-              appointments={getAppointmentsForDate(date)}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div
+              style={{
+                width: 12,
+                height: 12,
+                borderRadius: 3,
+                background: C.green,
+              }}
             />
-          ))}
+            <span>Confirmed</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div
+              style={{
+                width: 12,
+                height: 12,
+                borderRadius: 3,
+                background: C.yellow,
+              }}
+            />
+            <span>Pending</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div
+              style={{
+                width: 12,
+                height: 12,
+                borderRadius: 3,
+                background: C.blue,
+              }}
+            />
+            <span>Reminded</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div
+              style={{
+                width: 12,
+                height: 12,
+                borderRadius: 3,
+                background: C.red,
+              }}
+            />
+            <span>Cancelled</span>
+          </div>
+          {agentPhoneNumber && (
+            <div
+              style={{
+                marginLeft: "auto",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              {Icons.phone(C.accent, 14)}
+              <span style={{ fontWeight: 700, color: C.text }}>
+                Agent Phone #: {agentPhoneNumber}
+              </span>
+            </div>
+          )}
         </div>
-      )}
 
-      {viewMode === "day" && (
-        <SingleDayView
-          date={focusDate}
-          isToday={isSameDay(focusDate, today)}
-          appointments={getAppointmentsForDate(focusDate)}
+        {viewMode === "week" && (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(7, 1fr)",
+              gap: 12,
+              minHeight: "min(560px, 72vh)",
+            }}
+          >
+            {days.map((date, index) => (
+              <DayCard
+                key={index}
+                date={date}
+                isToday={isSameDay(date, today)}
+                dayIndex={index}
+                appointments={getAppointmentsForDate(date)}
+              />
+            ))}
+          </div>
+        )}
+
+        {viewMode === "day" && (
+          <SingleDayView
+            date={focusDate}
+            isToday={isSameDay(focusDate, today)}
+            appointments={getAppointmentsForDate(focusDate)}
+          />
+        )}
+
+        {viewMode === "all" && <AppointmentList appointments={appointments} />}
+      </div>
+
+      {/* Customer Sidebar */}
+      <div
+        style={{
+          width: 280,
+          flexShrink: 0,
+          background: C.card,
+          border: `1px solid ${C.border}`,
+          borderRadius: C.radius,
+          padding: 16,
+          maxHeight: "calc(100vh - 200px)",
+          overflowY: "auto",
+          boxShadow: C.shadow,
+        }}
+      >
+        <h3
+          style={{
+            fontSize: 14,
+            fontWeight: 700,
+            fontFamily: C.heading,
+            color: C.text,
+            margin: "0 0 12px 0",
+          }}
+        >
+          Customers ({customers.length})
+        </h3>
+
+        {/* Search Input */}
+        <div style={{ position: "relative", marginBottom: 12 }}>
+          <div
+            style={{
+              position: "absolute",
+              left: 12,
+              top: "50%",
+              transform: "translateY(-50%)",
+              pointerEvents: "none",
+            }}
+          >
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={C.textMuted} strokeWidth="2">
+              <circle cx="11" cy="11" r="8" />
+              <path d="M21 21l-4.35-4.35" />
+            </svg>
+          </div>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search customers..."
+            style={{
+              width: "100%",
+              padding: "8px 12px 8px 34px",
+              fontSize: 13,
+              fontFamily: C.body,
+              border: `1px solid ${C.border}`,
+              borderRadius: C.radiusSm,
+              background: C.bg,
+              color: C.text,
+              outline: "none",
+              boxSizing: "border-box",
+            }}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              style={{
+                position: "absolute",
+                right: 8,
+                top: "50%",
+                transform: "translateY(-50%)",
+                width: 18,
+                height: 18,
+                borderRadius: "50%",
+                border: "none",
+                background: C.border,
+                color: C.textMuted,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 12,
+              }}
+            >
+              ×
+            </button>
+          )}
+        </div>
+
+        {/* Filtered count */}
+        {searchQuery && filteredCustomers.length !== customers.length && (
+          <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 8 }}>
+            Showing {filteredCustomers.length} of {customers.length}
+          </div>
+        )}
+
+        {/* Customer Cards */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {customersLoading ? (
+            <div
+              style={{
+                textAlign: "center",
+                padding: "32px 16px",
+                color: C.textMuted,
+                fontSize: 13,
+              }}
+            >
+              Loading customers...
+            </div>
+          ) : customersError ? (
+            <div
+              style={{
+                textAlign: "center",
+                padding: "24px 16px",
+                color: C.red,
+                fontSize: 13,
+                background: C.redLight,
+                borderRadius: C.radiusSm,
+              }}
+            >
+              <div style={{ marginBottom: 4 }}>Error loading customers</div>
+              <div style={{ fontSize: 11, color: C.textMuted }}>{customersError}</div>
+            </div>
+          ) : filteredCustomers.length > 0 ? (
+            filteredCustomers.map((customer, index) => (
+              <CustomerCard
+                key={customer.id}
+                customer={customer}
+                appointments={appointments}
+                onClick={() => setSelectedCustomer(customer)}
+                delay={index * 0.03}
+              />
+            ))
+          ) : customers.length === 0 ? (
+            <div
+              style={{
+                textAlign: "center",
+                padding: "32px 16px",
+                color: C.textMuted,
+                fontSize: 13,
+              }}
+            >
+              <div style={{ marginBottom: 8 }}>No customers yet</div>
+              <div style={{ fontSize: 12 }}>
+                Click "Sync Now" to fetch customers
+              </div>
+            </div>
+          ) : (
+            <div
+              style={{
+                textAlign: "center",
+                padding: "24px 16px",
+                color: C.textMuted,
+                fontSize: 13,
+              }}
+            >
+              No customers match "{searchQuery}"
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Customer Detail Modal */}
+      {selectedCustomer && (
+        <CustomerDetailModal
+          customer={selectedCustomer}
+          businessId={businessId}
+          appointments={appointments}
+          onClose={() => setSelectedCustomer(null)}
         />
       )}
-
-      {viewMode === "all" && <AppointmentList appointments={appointments} />}
     </div>
   );
 }

@@ -178,16 +178,31 @@ function splitExtractedFields(extractedFields: Record<string, string> | undefine
 /**
  * Sync a single Teli call to Supabase
  * Creates or updates customer, logs the call
+ * @param businessId - The business UUID
+ * @param call - The Teli call data
+ * @param businessName - Optional business_name to avoid extra DB lookup
  */
 export async function syncCallToSupabase(
   businessId: string,
-  call: TeliCall
+  call: TeliCall,
+  businessName?: string
 ): Promise<{ success: boolean; customerId?: string; isNew?: boolean; error?: string }> {
   const supabase = createAdminClient()
 
   try {
     const { universal, custom } = splitExtractedFields(call.extracted_fields)
     const phoneNumber = call.from_number
+
+    // Use provided businessName or fetch from DB
+    let resolvedBusinessName = businessName
+    if (!resolvedBusinessName) {
+      const { data: business } = await supabase
+        .from('businesses')
+        .select('business_name')
+        .eq('id', businessId)
+        .single()
+      resolvedBusinessName = business?.business_name || undefined
+    }
 
     // Check if customer exists
     const { data: existingCustomer } = await supabase
@@ -201,11 +216,12 @@ export async function syncCallToSupabase(
     let isNew = false
 
     if (!existingCustomer) {
-      // Create new customer
+      // Create new customer - include business_name for matching
       const { data: newCustomer, error } = await supabase
         .from('customers')
         .insert({
           business_id: businessId,
+          business_name: resolvedBusinessName,  // Add business_name for matching
           first_name: universal.first_name || 'New',
           last_name: universal.last_name || 'Customer',
           phone_number: phoneNumber,
@@ -290,12 +306,22 @@ export async function pullAndSyncCalls(
   newCustomers: number
   errors: string[]
 }> {
+  const supabase = createAdminClient()
   const result = {
     success: true,
     synced: 0,
     newCustomers: 0,
     errors: [] as string[],
   }
+
+  // Fetch the business to get business_name (once, not per call)
+  const { data: business } = await supabase
+    .from('businesses')
+    .select('business_name')
+    .eq('id', businessId)
+    .single()
+
+  const businessName = business?.business_name
 
   // Fetch calls from Teli
   const fetchResult = await fetchTeliCalls(agentId, since)
@@ -310,7 +336,7 @@ export async function pullAndSyncCalls(
 
   // Sync each call
   for (const call of fetchResult.calls) {
-    const syncResult = await syncCallToSupabase(businessId, call)
+    const syncResult = await syncCallToSupabase(businessId, call, businessName)
 
     if (syncResult.success) {
       result.synced++
@@ -526,13 +552,13 @@ export async function syncAllOrganizationCalls(
 
       // Inject business_name into extracted_fields for reliable association
       if (call.extracted_fields) {
-        call.extracted_fields.business_name = business.name
+        call.extracted_fields.business_name = business.business_name
       } else {
-        call.extracted_fields = { business_name: business.name }
+        call.extracted_fields = { business_name: business.business_name }
       }
 
-      // Sync the call to the correct business
-      const syncResult = await syncCallToSupabase(business.id, call)
+      // Sync the call to the correct business, passing business_name directly
+      const syncResult = await syncCallToSupabase(business.id, call, business.business_name)
 
       if (syncResult.success) {
         result.syncedCalls++

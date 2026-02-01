@@ -43,8 +43,7 @@ This document outlines the implementation plan for TypeScript functions that int
 ### Environment Variables
 
 ```env
-TELI_API_URL=https://teli-hackathon--transfer-message-service-fastapi-app.modal.run
-TELI_API_KEY=hackathon-sms-api-key-h4ck-2024-a1b2-c3d4e5f67890
+
 ```
 
 ### Fixed Values

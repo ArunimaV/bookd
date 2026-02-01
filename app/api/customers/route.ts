@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 
 // GET /api/customers - List customers
+// Supports filtering by business_id OR business_name
 export async function GET(request: NextRequest) {
   const supabase = createAdminClient();
   const { searchParams } = new URL(request.url);
   
   const businessId = searchParams.get("business_id");
+  const businessName = searchParams.get("business_name");
   const search = searchParams.get("search");
 
   let query = supabase
@@ -14,7 +16,10 @@ export async function GET(request: NextRequest) {
     .select("*")
     .order("created_at", { ascending: false });
 
-  if (businessId) {
+  // Filter by business_name (preferred) or business_id
+  if (businessName) {
+    query = query.eq("business_name", businessName);
+  } else if (businessId) {
     query = query.eq("business_id", businessId);
   }
 
