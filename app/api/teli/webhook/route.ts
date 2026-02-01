@@ -14,6 +14,38 @@ interface TeliWebhookPayload {
   };
   agent_id?: string;
   timestamp: string;
+  // Extracted fields from Teli voice agent
+  extracted_fields?: Record<string, string>;
+}
+
+// Universal fields that get extracted into fixed columns
+// Everything else goes into custom_fields JSONB
+const UNIVERSAL_FIELDS = [
+  'first_name',
+  'last_name',
+  'appointment_time',
+  'day',
+  'month',
+  'phone',
+  'email'
+];
+
+// Split extracted fields into universal and custom
+function splitExtractedFields(extractedFields: Record<string, string> | undefined) {
+  if (!extractedFields) return { universal: {}, custom: {} };
+
+  const universal: Record<string, string> = {};
+  const custom: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(extractedFields)) {
+    if (UNIVERSAL_FIELDS.includes(key)) {
+      universal[key] = value;
+    } else {
+      custom[key] = value;
+    }
+  }
+
+  return { universal, custom };
 }
 
 // Parse natural language time to Date
@@ -94,6 +126,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No business found" }, { status: 404 });
     }
 
+    // Split extracted fields into universal (fixed columns) and custom (JSONB)
+    const { universal, custom } = splitExtractedFields(payload.extracted_fields);
+
+    // Build customer name from extracted fields or default
+    const customerName = universal.first_name
+      ? `${universal.first_name} ${universal.last_name || ''}`.trim()
+      : "New Customer";
+
     // Find or create customer by phone
     let { data: customer } = await supabase
       .from("customers")
@@ -103,18 +143,39 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (!customer) {
+      // Create new customer with custom fields
       const { data: newCustomer, error } = await supabase
         .from("customers")
         .insert({
           business_id: business.id,
-          name: "New Customer", // Teli might provide this
+          name: customerName,
           phone: payload.phone,
+          email: universal.email || null,
+          custom_fields: custom,
         })
         .select()
         .single();
 
       if (error) throw error;
       customer = newCustomer;
+    } else if (Object.keys(custom).length > 0) {
+      // Update existing customer's custom fields (merge with existing)
+      const existingCustomFields = (customer.custom_fields as Record<string, string>) || {};
+      const mergedCustomFields = { ...existingCustomFields, ...custom };
+
+      const { data: updatedCustomer, error } = await supabase
+        .from("customers")
+        .update({
+          name: customerName !== "New Customer" ? customerName : customer.name,
+          email: universal.email || customer.email,
+          custom_fields: mergedCustomFields,
+        })
+        .eq("id", customer.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      customer = updatedCustomer;
     }
 
     // Log the message

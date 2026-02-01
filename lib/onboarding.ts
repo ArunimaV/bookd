@@ -48,8 +48,8 @@ export interface OnboardingInputs {
 export async function completeOnboarding(inputs: OnboardingInputs) {
   const supabase = createAdminClient()
 
-  // Generate owner_id (UUID) for the user
-  const ownerId = crypto.randomUUID()
+  // Generate user_id (UUID) for the business/user
+  const userId = crypto.randomUUID()
 
   // Create slug from org name
   const slug = inputs.orgName
@@ -78,10 +78,10 @@ export async function completeOnboarding(inputs: OnboardingInputs) {
   const { data, error } = await supabase
     .from('businesses')
     .insert({
-      owner_id: ownerId,
+      user_id: userId,
       owner_email: inputs.ownerEmail,
       name: inputs.orgName,
-      slug: slug,
+      business_name: slug,
       teli_phone_number: inputs.phoneNumber,
       teli_agent_id: inputs.voiceAgentId,
       timezone: inputs.timezone || 'America/New_York',
