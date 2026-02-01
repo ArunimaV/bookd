@@ -106,7 +106,7 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
             textAlign: "center",
           }}
         >
-          Welcome to Teli
+          Welcome to Bookd
         </h1>
         <p
           style={{

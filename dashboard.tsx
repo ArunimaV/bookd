@@ -1,4 +1,5 @@
 import React, { useState, useEffect, Suspense, lazy, ReactNode } from "react";
+import { useRouter } from "next/navigation";
 
 // Theme & Styles
 import { C, FONT_LINK } from "./dashboard/theme";
@@ -100,6 +101,7 @@ function TabContent({ activeTab }: { activeTab: TabId }): ReactNode {
 }
 
 export default function App(): ReactNode {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabId>("calendar");
   const [business, setBusiness] = useState<any>(null);
   const [checkingBusiness, setCheckingBusiness] = useState(true);
@@ -122,6 +124,11 @@ export default function App(): ReactNode {
 
   const handleTabChange = (tabId: TabId) => {
     setActiveTab(tabId);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("teli_business");
+    router.push("/login");
   };
 
   // Show loading while checking
@@ -174,6 +181,7 @@ export default function App(): ReactNode {
           tabs={tabs}
           activeTab={activeTab}
           onTabChange={handleTabChange}
+          onLogout={handleLogout}
         />
 
         {/* Main Content */}
