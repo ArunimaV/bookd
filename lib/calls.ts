@@ -18,9 +18,8 @@ export interface TeliCallData {
 export interface ProcessedCustomer {
   id: string
   business_id: string
-  first_name: string
-  last_name: string
-  phone_number: string
+  name: string
+  phone: string
   email: string | null
   custom_fields: Record<string, string>
   created_at: string
@@ -32,10 +31,11 @@ export interface ProcessedCustomer {
 const UNIVERSAL_FIELDS = [
   'first_name',
   'last_name',
+  'name',
   'appointment_time',
   'day',
   'month',
-  'phone_number',
+  'phone',
   'email'
 ]
 
@@ -130,11 +130,16 @@ export async function processCallAndStoreCustomer(
       .from('customers')
       .select('*')
       .eq('business_id', businessId)
-      .eq('phone_number', callData.phone_number)
+      .eq('phone', callData.phone_number)
       .single()
 
     let customer: any
     let isNew = false
+
+    // Build name from extracted fields
+    const customerName = universal.name || 
+      [universal.first_name, universal.last_name].filter(Boolean).join(' ') || 
+      'New Customer'
 
     if (!existingCustomer) {
       // Create new customer
@@ -142,9 +147,8 @@ export async function processCallAndStoreCustomer(
         .from('customers')
         .insert({
           business_id: businessId,
-          first_name: universal.first_name || 'New',
-          last_name: universal.last_name || 'Customer',
-          phone_number: callData.phone_number,
+          name: customerName,
+          phone: callData.phone_number,
           email: universal.email || null,
           custom_fields: custom,
           call_transcript: transcript || null,
@@ -161,8 +165,7 @@ export async function processCallAndStoreCustomer(
       const mergedCustomFields = { ...existingCustomFields, ...custom }
 
       const updatePayload: Record<string, any> = {
-        first_name: universal.first_name || existingCustomer.first_name,
-        last_name: universal.last_name || existingCustomer.last_name,
+        name: customerName !== 'New Customer' ? customerName : existingCustomer.name,
         email: universal.email || existingCustomer.email,
         custom_fields: mergedCustomFields,
       }
@@ -197,9 +200,8 @@ export async function processCallAndStoreCustomer(
       customer: {
         id: customer.id,
         business_id: customer.business_id,
-        first_name: customer.first_name,
-        last_name: customer.last_name,
-        phone_number: customer.phone_number,
+        name: customer.name,
+        phone: customer.phone,
         email: customer.email,
         custom_fields: customer.custom_fields || {},
         created_at: customer.created_at,
@@ -237,9 +239,8 @@ export async function getRecentCustomers(
     const customers: ProcessedCustomer[] = data.map((c: any) => ({
       id: c.id,
       business_id: c.business_id,
-      first_name: c.first_name,
-      last_name: c.last_name,
-      phone_number: c.phone_number,
+      name: c.name,
+      phone: c.phone,
       email: c.email,
       custom_fields: c.custom_fields || {},
       created_at: c.created_at,
@@ -278,9 +279,8 @@ export async function getCustomersSince(
     const customers: ProcessedCustomer[] = data.map((c: any) => ({
       id: c.id,
       business_id: c.business_id,
-      first_name: c.first_name,
-      last_name: c.last_name,
-      phone_number: c.phone_number,
+      name: c.name,
+      phone: c.phone,
       email: c.email,
       custom_fields: c.custom_fields || {},
       created_at: c.created_at,

@@ -177,12 +177,23 @@ export async function POST(request: NextRequest) {
     }
 
     if (payload.event_type === "call" && payload.call_id) {
+      console.log("Processing call event with call_id:", payload.call_id);
       const transcript = await fetchCallTranscript(payload.call_id);
+      
       if (transcript) {
-        await supabase
+        console.log("Attempting to save transcript for customer:", customer.id);
+        const { error: transcriptError } = await supabase
           .from("customers")
           .update({ call_transcript: transcript })
           .eq("id", customer.id);
+        
+        if (transcriptError) {
+          console.error("Failed to save transcript:", transcriptError);
+        } else {
+          console.log("Transcript saved successfully for customer:", customer.id);
+        }
+      } else {
+        console.warn("No transcript returned for call_id:", payload.call_id);
       }
     }
 
