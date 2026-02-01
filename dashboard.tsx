@@ -282,6 +282,7 @@ export default function App({ defaultTab = "calendar" }: AppProps): ReactNode {
           activeTab={activeTab}
           onTabChange={handleTabChange}
           onLogout={handleLogout}
+          businessName={business?.name}
         />
 
         {/* Main Content */}
