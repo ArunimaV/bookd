@@ -1,5 +1,6 @@
 import React, { useState, useEffect, Suspense, lazy, ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { createBrowserSupabaseClient } from "./lib/supabase/client";
 
 // Theme & Styles
 import { C, FONT_LINK } from "./dashboard/theme";
@@ -108,16 +109,19 @@ function TabContent({ activeTab }: { activeTab: TabId }): ReactNode {
 
 export default function App(): ReactNode {
   const router = useRouter();
+  const supabase = createBrowserSupabaseClient();
+
   const [activeTab, setActiveTab] = useState<TabId>("calendar");
   const [business, setBusiness] = useState<any>(null);
-  const [checkingBusiness, setCheckingBusiness] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
   const tabs = getTabDefinitions(LEADS);
 
   // Poll for new calls/customers from Supabase
   const { newCustomers, clearNewCustomers, refetch: refetchCustomers } = useNewCalls({
     businessId: business?.id,
-    pollInterval: 5000, // Check every 5 seconds
+    pollInterval: 5000,
     enabled: !!business,
   });
 
@@ -133,17 +137,36 @@ export default function App(): ReactNode {
     refetchCustomers();
   };
 
-  // Check if business exists (using localStorage for demo)
+  // Check auth session and fetch business
   useEffect(() => {
-    const savedBusiness = localStorage.getItem("teli_business");
-    if (savedBusiness) {
-      setBusiness(JSON.parse(savedBusiness));
-    }
-    setCheckingBusiness(false);
-  }, []);
+    const checkAuth = async () => {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+
+      if (!authUser) {
+        router.push("/login");
+        return;
+      }
+
+      setUser(authUser);
+
+      // Fetch business for this user
+      const { data: bizData } = await supabase
+        .from("businesses")
+        .select("*")
+        .eq("user_id", authUser.id)
+        .single();
+
+      if (bizData) {
+        setBusiness(bizData);
+      }
+
+      setCheckingAuth(false);
+    };
+
+    checkAuth();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleOnboardingComplete = (newBusiness: any) => {
-    localStorage.setItem("teli_business", JSON.stringify(newBusiness));
     setBusiness(newBusiness);
   };
 
@@ -151,13 +174,14 @@ export default function App(): ReactNode {
     setActiveTab(tabId);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("teli_business");
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     router.push("/login");
+    router.refresh();
   };
 
-  // Show loading while checking
-  if (checkingBusiness) {
+  // Show loading while checking auth
+  if (checkingAuth) {
     return (
       <div style={{
         minHeight: "100vh",
@@ -173,13 +197,17 @@ export default function App(): ReactNode {
     );
   }
 
-  // Show onboarding if no business
-  if (!business) {
+  // Show onboarding if authenticated but no business
+  if (!business && user) {
     return (
       <>
         <link href={FONT_LINK} rel="stylesheet" />
         <style>{globalStyles}</style>
-        <OnboardingForm onComplete={handleOnboardingComplete} />
+        <OnboardingForm
+          onComplete={handleOnboardingComplete}
+          userEmail={user.email || ""}
+          userId={user.id}
+        />
       </>
     );
   }

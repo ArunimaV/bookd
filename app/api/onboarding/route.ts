@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
 
     // Validate required fields
-    const { ownerEmail, orgName, phoneNumber, voiceAgentId } = body
+    const { ownerEmail, orgName, phoneNumber, voiceAgentId, userId } = body
 
     if (!ownerEmail || !orgName || !phoneNumber || !voiceAgentId) {
       return NextResponse.json(
@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
       orgName,
       phoneNumber,
       voiceAgentId,
+      userId,
       timezone: body.timezone,
       workHours: body.workHours,
       services: body.services,
