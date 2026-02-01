@@ -76,29 +76,50 @@ export async function fetchCallTranscript(callId: string): Promise<string | unde
   const apiUrl = process.env.API_URL
   const apiKey = process.env.TELI_API_KEY
 
+  console.log('[fetchCallTranscript] Starting for callId:', callId)
+  console.log('[fetchCallTranscript] API_URL:', apiUrl || 'NOT SET')
+  console.log('[fetchCallTranscript] TELI_API_KEY:', apiKey ? `${apiKey.slice(0, 10)}...` : 'NOT SET')
+
   if (!apiUrl || !apiKey) {
-    console.warn('Missing API_URL or TELI_API_KEY; skipping transcript fetch')
+    console.error('[fetchCallTranscript] MISSING ENV VARS - API_URL:', !!apiUrl, 'TELI_API_KEY:', !!apiKey)
     return undefined
   }
 
   try {
     const normalizedBase = apiUrl.replace(/\/$/, '')
-    const response = await fetch(`${normalizedBase}/v1/voice/calls/${callId}`, {
+    const url = `${normalizedBase}/v1/voice/calls/${callId}`
+    console.log('[fetchCallTranscript] Fetching URL:', url)
+    
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
         'X-API-Key': apiKey,
       },
     })
 
+    console.log('[fetchCallTranscript] Response status:', response.status, response.statusText)
+
     if (!response.ok) {
-      console.warn('Failed to fetch call details', response.status, response.statusText)
+      const errorText = await response.text()
+      console.error('[fetchCallTranscript] Error response body:', errorText)
       return undefined
     }
 
     const data = await response.json()
-    return extractTranscript(data)
+    console.log('[fetchCallTranscript] Response keys:', Object.keys(data))
+    console.log('[fetchCallTranscript] Has transcript field:', 'transcript' in data)
+    
+    if (data.transcript) {
+      console.log('[fetchCallTranscript] Transcript length:', data.transcript.length)
+      console.log('[fetchCallTranscript] Transcript preview:', data.transcript.slice(0, 100))
+    }
+
+    const transcript = extractTranscript(data)
+    console.log('[fetchCallTranscript] Extracted transcript:', transcript ? `Found (${transcript.length} chars)` : 'NOT FOUND')
+    
+    return transcript
   } catch (error) {
-    console.error('Error fetching call transcript:', error)
+    console.error('[fetchCallTranscript] Exception:', error)
     return undefined
   }
 }
