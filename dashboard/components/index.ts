@@ -11,3 +11,7 @@ export { LeadDetail } from "./LeadDetail";
 export { Header } from "./Header";
 export { TabNav } from "./TabNav";
 export { StatsGrid } from "./StatsGrid";
+
+// Sync Components
+export { SyncButton } from "./SyncButton";
+export { SyncAllButton } from "./SyncAllButton";

@@ -19,10 +19,12 @@ import { StatsGrid } from "./dashboard/components/StatsGrid";
 import { OnboardingForm } from "./dashboard/components/OnboardingForm";
 import { NewCallsNotification } from "./dashboard/components/NewCallsNotification";
 import { SyncButton } from "./dashboard/components/SyncButton";
+import { SyncAllButton } from "./dashboard/components/SyncAllButton";
 
 // Hooks
 import { useNewCalls } from "./dashboard/hooks/useNewCalls";
 import { useTeliSync } from "./dashboard/hooks/useTeliSync";
+import { useSyncAll } from "./dashboard/hooks/useSyncAll";
 
 // Types
 import type { TabId, TabDef, Lead } from "./dashboard/types";
@@ -165,9 +167,24 @@ export default function App({ defaultTab = "calendar" }: AppProps): ReactNode {
     agentId: business?.teli_agent_id,
   });
 
+  // Sync ALL organization calls (admin sync)
+  const {
+    lastSync: lastSyncAll,
+    isSyncing: isSyncingAll,
+    lastResult: lastResultAll,
+    error: syncAllError,
+    syncAll,
+  } = useSyncAll();
+
   // When sync completes, refetch customers to show new data
   const handleSyncNow = async () => {
     await syncNow();
+    refetchCustomers();
+  };
+
+  // When sync all completes, refetch customers
+  const handleSyncAll = async () => {
+    await syncAll();
     refetchCustomers();
   };
 
@@ -287,12 +304,19 @@ export default function App({ defaultTab = "calendar" }: AppProps): ReactNode {
         {/* Main Content */}
         <div style={{ padding: "20px 28px" }}>
           {/* Sync Button Row */}
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 16, marginBottom: 16 }}>
             <SyncButton
               onSync={handleSyncNow}
               isSyncing={isSyncing}
               lastSync={lastSync}
               lastResult={lastResult}
+            />
+            <SyncAllButton
+              onSync={handleSyncAll}
+              isSyncing={isSyncingAll}
+              lastSync={lastSyncAll}
+              lastResult={lastResultAll}
+              error={syncAllError}
             />
           </div>
 
