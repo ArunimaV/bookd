@@ -215,6 +215,7 @@ export async function syncCallToSupabase(
           month: universal.month || null,
           day: universal.day || null,
           custom_fields: custom,
+          call_transcript: call.transcript || null,  // Store transcript
         })
         .select()
         .single()
@@ -227,18 +228,26 @@ export async function syncCallToSupabase(
       const existingCustomFields = (existingCustomer.custom_fields as Record<string, string>) || {}
       const mergedCustomFields = { ...existingCustomFields, ...custom }
 
+      // Build update payload
+      const updatePayload: Record<string, any> = {
+        first_name: universal.first_name || existingCustomer.first_name,
+        last_name: universal.last_name || existingCustomer.last_name,
+        email: universal.email || existingCustomer.email,
+        call_id: call.call_id,
+        appointment_time: universal.appointment_time || existingCustomer.appointment_time,
+        month: universal.month || existingCustomer.month,
+        day: universal.day || existingCustomer.day,
+        custom_fields: mergedCustomFields,
+      }
+
+      // Add transcript if available
+      if (call.transcript) {
+        updatePayload.call_transcript = call.transcript
+      }
+
       const { data: updatedCustomer, error } = await supabase
         .from('customers')
-        .update({
-          first_name: universal.first_name || existingCustomer.first_name,
-          last_name: universal.last_name || existingCustomer.last_name,
-          email: universal.email || existingCustomer.email,
-          call_id: call.call_id,
-          appointment_time: universal.appointment_time || existingCustomer.appointment_time,
-          month: universal.month || existingCustomer.month,
-          day: universal.day || existingCustomer.day,
-          custom_fields: mergedCustomFields,
-        })
+        .update(updatePayload)
         .eq('id', existingCustomer.id)
         .select()
         .single()
@@ -551,6 +560,117 @@ export async function syncAllOrganizationCalls(
     return result
   } catch (error) {
     console.error('Error in syncAllOrganizationCalls:', error)
+    return {
+      ...result,
+      success: false,
+      errors: [error instanceof Error ? error.message : 'Unknown error'],
+    }
+  }
+}
+
+// ============================================
+// TRANSCRIPT BACKFILL
+// ============================================
+
+export interface BackfillResult {
+  success: boolean
+  totalCalls: number
+  updatedCustomers: number
+  skippedNoTranscript: number
+  skippedNoCustomer: number
+  errors: string[]
+}
+
+/**
+ * Backfill transcripts for existing customers
+ * This fetches all org calls and updates customers that are missing transcripts
+ */
+export async function backfillTranscripts(): Promise<BackfillResult> {
+  const supabase = createAdminClient()
+  
+  const result: BackfillResult = {
+    success: true,
+    totalCalls: 0,
+    updatedCustomers: 0,
+    skippedNoTranscript: 0,
+    skippedNoCustomer: 0,
+    errors: [],
+  }
+
+  try {
+    // Fetch all org calls
+    const fetchResult = await fetchAllOrganizationCalls({ limit: 100 })
+
+    if (!fetchResult.success || !fetchResult.calls) {
+      return {
+        ...result,
+        success: false,
+        errors: [fetchResult.error || 'Failed to fetch calls'],
+      }
+    }
+
+    result.totalCalls = fetchResult.calls.length
+
+    // Build agent -> business map
+    const agentToBusinessMap = await buildAgentToBusinessMap()
+
+    // Process each call
+    for (const call of fetchResult.calls) {
+      // Skip calls without transcripts
+      if (!call.transcript) {
+        result.skippedNoTranscript++
+        continue
+      }
+
+      // Find the business
+      const agentId = call.voice_agent_id || call.agent_id
+      if (!agentId) {
+        result.skippedNoCustomer++
+        continue
+      }
+
+      const business = agentToBusinessMap.get(agentId)
+      if (!business) {
+        result.skippedNoCustomer++
+        continue
+      }
+
+      // Find the customer by phone number
+      const phoneNumber = call.from_number
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('id, call_transcript')
+        .eq('business_id', business.id)
+        .eq('phone_number', phoneNumber)
+        .single()
+
+      if (!customer) {
+        result.skippedNoCustomer++
+        continue
+      }
+
+      // Skip if customer already has a transcript
+      if (customer.call_transcript) {
+        continue
+      }
+
+      // Update the customer with the transcript
+      const { error } = await supabase
+        .from('customers')
+        .update({ call_transcript: call.transcript })
+        .eq('id', customer.id)
+
+      if (error) {
+        result.errors.push(`Customer ${customer.id}: ${error.message}`)
+      } else {
+        result.updatedCustomers++
+      }
+    }
+
+    console.log(`[Backfill] Complete: ${result.updatedCustomers} customers updated with transcripts`)
+    return result
+  } catch (error) {
+    console.error('Error in backfillTranscripts:', error)
     return {
       ...result,
       success: false,

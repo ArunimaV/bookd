@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { syncAllOrganizationCalls } from '@/lib/teli'
+import { syncAllOrganizationCalls, backfillTranscripts } from '@/lib/teli'
 
 /**
  * POST /api/teli/sync-all - Sync all organization calls to Supabase
@@ -51,6 +51,31 @@ export async function GET() {
   return NextResponse.json({ 
     status: 'ok', 
     endpoint: 'teli-sync-all',
-    description: 'POST to this endpoint to sync all organization calls'
+    description: 'POST to sync all calls, PUT to backfill transcripts'
   })
+}
+
+/**
+ * PUT /api/teli/sync-all - Backfill transcripts for existing customers
+ * 
+ * This updates customers that are missing transcripts from their call data.
+ * Use this to update existing records that were synced before transcript storage was added.
+ */
+export async function PUT() {
+  try {
+    console.log('[API] Starting transcript backfill...')
+    
+    const result = await backfillTranscripts()
+
+    return NextResponse.json(result)
+  } catch (error) {
+    console.error('Backfill API error:', error)
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Internal server error' 
+      },
+      { status: 500 }
+    )
+  }
 }
