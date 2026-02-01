@@ -12,20 +12,34 @@ const TELI_API_KEY = process.env.TELI_API_KEY
 // ============================================
 
 export interface TeliCall {
-  id: string
-  phone: string
-  timestamp: string
-  duration?: number
-  status: 'completed' | 'missed' | 'ongoing'
-  extracted_fields?: Record<string, string>
-  transcript?: string
+  call_id: string
+  voice_agent_id?: string
+  agent_id?: string
+  agent_name?: string
+  direction?: string
+  call_type?: string
+  from_number: string
+  to_number?: string
+  call_status: string
+  start_timestamp?: string
+  end_timestamp?: string
+  duration_ms?: number
+  disconnection_reason?: string
+  user_sentiment?: string
+  call_successful?: boolean
+  in_voicemail?: boolean
   recording_url?: string
+  transcript?: string
+  extracted_fields?: Record<string, string>
+  call_analysis?: Record<string, any>
+  metadata?: Record<string, any>
 }
 
 export interface TeliCallsResponse {
+  success: boolean
   calls: TeliCall[]
-  has_more: boolean
-  next_cursor?: string
+  count: number
+  powered_by: string
 }
 
 // Universal fields that go into fixed columns
@@ -35,7 +49,7 @@ const UNIVERSAL_FIELDS = [
   'appointment_time',
   'day',
   'month',
-  'phone',
+  'phone_number',
   'email'
 ]
 
@@ -47,29 +61,32 @@ const UNIVERSAL_FIELDS = [
  * Fetch recent calls from Teli API
  */
 export async function fetchTeliCalls(
-  agentId: string,
+  organizationId: string,
   since?: string,
   limit: number = 50
 ): Promise<{ success: boolean; calls?: TeliCall[]; error?: string }> {
   try {
     const params = new URLSearchParams({
-      agent_id: agentId,
+      organization_id: organizationId,
+      is_admin: 'false',
       limit: limit.toString(),
+      call_status: 'ended',
     })
 
     if (since) {
-      params.append('since', since)
+      params.append('start_date', since)
     }
 
-    const response = await fetch(`${TELI_API_BASE}/v1/calls?${params}`, {
+    const response = await fetch(`${TELI_API_BASE}/v1/voice/calls?${params}`, {
       headers: {
-        'Authorization': `Bearer ${TELI_API_KEY}`,
+        'X-API-Key': TELI_API_KEY || '',
         'Content-Type': 'application/json',
       },
     })
 
     if (!response.ok) {
-      throw new Error(`Teli API error: ${response.status}`)
+      const errBody = await response.text()
+      throw new Error(`Teli API error: ${response.status} - ${errBody}`)
     }
 
     const data: TeliCallsResponse = await response.json()
@@ -90,19 +107,20 @@ export async function fetchTeliCallDetails(
   callId: string
 ): Promise<{ success: boolean; call?: TeliCall; error?: string }> {
   try {
-    const response = await fetch(`${TELI_API_BASE}/v1/calls/${callId}`, {
+    const response = await fetch(`${TELI_API_BASE}/v1/voice/calls/${callId}`, {
       headers: {
-        'Authorization': `Bearer ${TELI_API_KEY}`,
+        'X-API-Key': TELI_API_KEY || '',
         'Content-Type': 'application/json',
       },
     })
 
     if (!response.ok) {
-      throw new Error(`Teli API error: ${response.status}`)
+      const errBody = await response.text()
+      throw new Error(`Teli API error: ${response.status} - ${errBody}`)
     }
 
-    const call: TeliCall = await response.json()
-    return { success: true, call }
+    const data = await response.json()
+    return { success: true, call: data.call }
   } catch (error) {
     console.error('Error fetching Teli call details:', error)
     return {
@@ -148,13 +166,14 @@ export async function syncCallToSupabase(
 
   try {
     const { universal, custom } = splitExtractedFields(call.extracted_fields)
+    const phoneNumber = call.from_number
 
     // Check if customer exists
     const { data: existingCustomer } = await supabase
       .from('customers')
       .select('*')
       .eq('business_id', businessId)
-      .eq('phone', call.phone)
+      .eq('phone_number', phoneNumber)
       .single()
 
     let customer: any
@@ -168,8 +187,12 @@ export async function syncCallToSupabase(
           business_id: businessId,
           first_name: universal.first_name || 'New',
           last_name: universal.last_name || 'Customer',
-          phone: call.phone,
+          phone_number: phoneNumber,
           email: universal.email || null,
+          call_id: call.call_id,
+          appointment_time: universal.appointment_time || null,
+          month: universal.month || null,
+          day: universal.day || null,
           custom_fields: custom,
         })
         .select()
@@ -189,6 +212,10 @@ export async function syncCallToSupabase(
           first_name: universal.first_name || existingCustomer.first_name,
           last_name: universal.last_name || existingCustomer.last_name,
           email: universal.email || existingCustomer.email,
+          call_id: call.call_id,
+          appointment_time: universal.appointment_time || existingCustomer.appointment_time,
+          month: universal.month || existingCustomer.month,
+          day: universal.day || existingCustomer.day,
           custom_fields: mergedCustomFields,
         })
         .eq('id', existingCustomer.id)
@@ -205,7 +232,7 @@ export async function syncCallToSupabase(
       customer_id: customer.id,
       direction: 'inbound',
       channel: 'call',
-      content: call.transcript || `Call from ${call.phone}`,
+      content: call.transcript || `Call from ${phoneNumber}`,
       teli_data: call as any,
     })
 
@@ -261,7 +288,7 @@ export async function pullAndSyncCalls(
         result.newCustomers++
       }
     } else {
-      result.errors.push(`Call ${call.id}: ${syncResult.error}`)
+      result.errors.push(`Call ${call.call_id}: ${syncResult.error}`)
     }
   }
 

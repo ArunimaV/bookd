@@ -6,7 +6,7 @@ import { createAdminClient } from './supabase/server'
 
 export interface TeliCallData {
   call_id: string
-  phone: string
+  phone_number: string
   timestamp: string
   duration?: number
   status: 'completed' | 'missed' | 'ongoing'
@@ -20,7 +20,7 @@ export interface ProcessedCustomer {
   business_id: string
   first_name: string
   last_name: string
-  phone: string
+  phone_number: string
   email: string | null
   custom_fields: Record<string, string>
   created_at: string
@@ -35,7 +35,7 @@ const UNIVERSAL_FIELDS = [
   'appointment_time',
   'day',
   'month',
-  'phone',
+  'phone_number',
   'email'
 ]
 
@@ -87,7 +87,7 @@ export async function processCallAndStoreCustomer(
       .from('customers')
       .select('*')
       .eq('business_id', businessId)
-      .eq('phone', callData.phone)
+      .eq('phone_number', callData.phone_number)
       .single()
 
     let customer: any
@@ -101,7 +101,7 @@ export async function processCallAndStoreCustomer(
           business_id: businessId,
           first_name: universal.first_name || 'New',
           last_name: universal.last_name || 'Customer',
-          phone: callData.phone,
+          phone_number: callData.phone_number,
           email: universal.email || null,
           custom_fields: custom,
         })
@@ -138,7 +138,7 @@ export async function processCallAndStoreCustomer(
       customer_id: customer.id,
       direction: 'inbound',
       channel: 'call',
-      content: callData.transcript || `Call from ${callData.phone}`,
+      content: callData.transcript || `Call from ${callData.phone_number}`,
       teli_data: callData as any,
     })
 
@@ -149,7 +149,7 @@ export async function processCallAndStoreCustomer(
         business_id: customer.business_id,
         first_name: customer.first_name,
         last_name: customer.last_name,
-        phone: customer.phone,
+        phone_number: customer.phone_number,
         email: customer.email,
         custom_fields: customer.custom_fields || {},
         created_at: customer.created_at,
@@ -189,7 +189,7 @@ export async function getRecentCustomers(
       business_id: c.business_id,
       first_name: c.first_name,
       last_name: c.last_name,
-      phone: c.phone,
+      phone_number: c.phone_number,
       email: c.email,
       custom_fields: c.custom_fields || {},
       created_at: c.created_at,
@@ -230,7 +230,7 @@ export async function getCustomersSince(
       business_id: c.business_id,
       first_name: c.first_name,
       last_name: c.last_name,
-      phone: c.phone,
+      phone_number: c.phone_number,
       email: c.email,
       custom_fields: c.custom_fields || {},
       created_at: c.created_at,
