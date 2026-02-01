@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { C } from "../theme";
 
 interface OnboardingFormProps {
@@ -7,6 +7,8 @@ interface OnboardingFormProps {
     phoneNumber: string;
     agentId: string;
   }) => void;
+  userEmail?: string;
+  userId?: string;
 }
 
 interface FormData {
@@ -44,7 +46,7 @@ const SUGGESTED_CUSTOM_FIELDS = [
   "referral_source",
 ];
 
-export function OnboardingForm({ onComplete }: OnboardingFormProps) {
+export function OnboardingForm({ onComplete, userEmail, userId }: OnboardingFormProps) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +54,7 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
 
   const [formData, setFormData] = useState<FormData>({
     ownerName: "",
-    ownerEmail: "",
+    ownerEmail: userEmail || "",
     orgName: "",
     areaCode: "",
     agentNickname: "",
@@ -61,6 +63,12 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
     voiceId: "openai-Nova",
     customExtractionFields: [],
   });
+
+  useEffect(() => {
+    if (userEmail && !formData.ownerEmail) {
+      setFormData((prev) => ({ ...prev, ownerEmail: userEmail }));
+    }
+  }, [userEmail, formData.ownerEmail]);
 
   const addCustomField = (field: string) => {
     if (field && !formData.customExtractionFields.includes(field)) {
@@ -105,6 +113,7 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
           agentPrompt: formData.agentPrompt,
           voiceId: formData.voiceId,
           customExtractionFields: formData.customExtractionFields,
+          userId,
         }),
       });
 

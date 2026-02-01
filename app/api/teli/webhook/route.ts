@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fetchCallTranscript } from "@/lib/calls";
 import { createAdminClient } from "@/lib/supabase/server";
 
 // Teli webhook payload structure (adjust based on actual Teli docs)
@@ -6,6 +7,7 @@ interface TeliWebhookPayload {
   event_type: "message" | "call" | "booking_intent";
   phone: string;
   message?: string;
+  call_id?: string;
   intent?: {
     type: "book" | "reschedule" | "cancel" | "inquiry";
     service?: string;
@@ -172,6 +174,16 @@ export async function POST(request: NextRequest) {
 
       if (error) throw error;
       customer = updatedCustomer;
+    }
+
+    if (payload.event_type === "call" && payload.call_id) {
+      const transcript = await fetchCallTranscript(payload.call_id);
+      if (transcript) {
+        await supabase
+          .from("customers")
+          .update({ call_transcript: transcript })
+          .eq("id", customer.id);
+      }
     }
 
     // Log the message

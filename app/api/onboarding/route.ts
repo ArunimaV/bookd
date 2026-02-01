@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
       agentPrompt,
       voiceId,
       customExtractionFields,
+      userId,
     } = body
 
     if (!ownerEmail || !ownerName || !orgName || !areaCode || !agentNickname || !startingMessage || !agentPrompt) {
@@ -83,6 +84,7 @@ export async function POST(request: NextRequest) {
     // 2. ONLY if Teli succeeds: Create the business in Supabase with Teli IDs
     const businessResult = await createBusinessWithTeliIds({
       id: businessId,
+      userId,
       ownerName,
       ownerEmail,
       orgName,

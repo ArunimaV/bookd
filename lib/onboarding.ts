@@ -7,6 +7,8 @@ import { createAdminClient } from './supabase/server'
 export interface CreateBusinessInputs {
   // Pre-generated ID
   id: string
+  // Auth user ID (if available)
+  userId?: string
 
   // User/Owner Info
   ownerEmail: string
@@ -89,7 +91,7 @@ export async function createBusinessWithTeliIds(inputs: CreateBusinessInputs) {
     .from('businesses')
     .insert({
       id: inputs.id,
-      user_id: inputs.id, // Use same ID for user_id
+      user_id: inputs.userId || inputs.id, // Prefer auth user ID when available
       owner_email: inputs.ownerEmail,
       owner_name: inputs.ownerName,
       name: inputs.orgName,
