@@ -86,12 +86,6 @@ function getTabDefinitions(leads: Lead[]): TabDef[] {
       count: leads.filter((l) => l.status === "new" || l.status === "urgent").length,
     },
     {
-      id: "leads",
-      label: "All Leads",
-      icon: Icons.people,
-      count: leads.length,
-    },
-    {
       id: "business_analytics",
       label: "Business Analytics",
       icon: Icons.chartBar,
@@ -172,7 +166,6 @@ function TabContent({
 const TAB_TO_URL: Record<TabId, string> = {
   calendar: "/calendar",
   inbox: "/inbox",
-  leads: "/leads",
   business_analytics: "/analytics",
   your_agent: "/agent",
   profile: "/profile",
@@ -404,7 +397,7 @@ export default function App({ defaultTab = "calendar" }: AppProps): ReactNode {
           newCustomers={newCustomers}
           onDismiss={clearNewCustomers}
           onViewAll={() => {
-            router.push("/leads");
+            router.push("/inbox");
             clearNewCustomers();
           }}
         />
