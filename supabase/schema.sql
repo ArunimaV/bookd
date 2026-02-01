@@ -11,28 +11,56 @@ create table if not exists businesses (
   id uuid primary key default uuid_generate_v4(),
   user_id uuid not null unique,  -- The business owner's unique identifier
   created_at timestamptz default now(),
+  
+  -- Business Info
   name text not null,            -- Display name (e.g., "Bloom Studio")
   business_name text not null,   -- URL-safe slug (e.g., "bloom-studio")
   owner_email text not null unique,
-  teli_phone_number text,
-  teli_agent_id text,
+  owner_name text,               -- Business owner's name
+  
+  -- Phone Setup
+  area_code text,                -- Area code for phone provisioning (e.g., "313")
+  
+  -- Teli Integration
+  teli_user_id text,             -- Teli user ID after creation
+  teli_phone_number text,        -- Provisioned phone number
+  teli_agent_id text,            -- Voice agent ID
+  
+  -- Voice Agent Configuration
+  starting_message text,         -- AI greeting message
+  agent_prompt text,             -- AI instructions/personality
+  voice_id text default 'openai-Nova',  -- Selected voice
+  
+  -- Calendar
   google_calendar_id text,
+  
+  -- Business Settings
   work_hours jsonb default '{
-    "monday": {"start": "09:00", "end": "17:00"},
-    "tuesday": {"start": "09:00", "end": "17:00"},
-    "wednesday": {"start": "09:00", "end": "17:00"},
-    "thursday": {"start": "09:00", "end": "17:00"},
-    "friday": {"start": "09:00", "end": "17:00"},
-    "saturday": null,
-    "sunday": null
+    "monday": {"start": "09:00", "end": "17:00", "off": false},
+    "tuesday": {"start": "09:00", "end": "17:00", "off": false},
+    "wednesday": {"start": "09:00", "end": "17:00", "off": false},
+    "thursday": {"start": "09:00", "end": "17:00", "off": false},
+    "friday": {"start": "09:00", "end": "17:00", "off": false},
+    "saturday": {"start": "10:00", "end": "14:00", "off": false},
+    "sunday": {"start": "00:00", "end": "00:00", "off": true}
   }'::jsonb,
   services jsonb default '[
-    {"name": "Haircut", "duration": 30, "price": 35},
-    {"name": "Beard Trim", "duration": 15, "price": 15},
-    {"name": "Hair Coloring", "duration": 90, "price": 85}
+    {"name": "Consultation", "duration": 30, "price": 0},
+    {"name": "Standard Service", "duration": 60, "price": 50}
   ]'::jsonb,
   timezone text default 'America/New_York'
 );
+
+-- ============================================
+-- MIGRATION: Add new columns if table exists
+-- Run these if you already have the table
+-- ============================================
+-- alter table businesses add column if not exists owner_name text;
+-- alter table businesses add column if not exists area_code text;
+-- alter table businesses add column if not exists teli_user_id text;
+-- alter table businesses add column if not exists starting_message text;
+-- alter table businesses add column if not exists agent_prompt text;
+-- alter table businesses add column if not exists voice_id text default 'openai-Nova';
 
 -- ============================================
 -- CUSTOMERS TABLE
@@ -118,6 +146,27 @@ create table if not exists messages (
 create index if not exists idx_messages_customer on messages(customer_id, created_at desc);
 
 -- ============================================
+-- CALL EXTRACTIONS TABLE
+-- Stores extracted data from each call
+-- ============================================
+create table if not exists call_extractions (
+  id uuid primary key default uuid_generate_v4(),
+  created_at timestamptz default now(),
+  business_id uuid references businesses(id) on delete cascade not null,
+  customer_id uuid references customers(id) on delete cascade,
+  call_id text,                  -- Teli call ID
+  phone_number text not null,    -- Caller's phone number
+  extracted_data jsonb not null, -- The actual extracted fields
+  call_summary text,             -- AI-generated call summary
+  call_duration int,             -- Duration in seconds
+  call_recording_url text        -- URL to recording if available
+);
+
+-- Index for call lookups
+create index if not exists idx_call_extractions_business on call_extractions(business_id, created_at desc);
+create index if not exists idx_call_extractions_phone on call_extractions(phone_number);
+
+-- ============================================
 -- ROW LEVEL SECURITY (RLS)
 -- ============================================
 
@@ -127,6 +176,7 @@ alter table customers enable row level security;
 alter table appointments enable row level security;
 alter table messages enable row level security;
 alter table custom_field_definitions enable row level security;
+alter table call_extractions enable row level security;
 
 -- For hackathon: Allow all operations (you'd scope this to auth.uid() in production)
 -- This allows the service role key to work for webhooks
@@ -136,12 +186,4 @@ create policy "Allow all for service role" on customers for all using (true);
 create policy "Allow all for service role" on appointments for all using (true);
 create policy "Allow all for service role" on messages for all using (true);
 create policy "Allow all for service role" on custom_field_definitions for all using (true);
-
--- ============================================
--- DEMO DATA (Optional)
--- ============================================
-
--- Insert a demo business
-insert into businesses (name, owner_email, teli_phone_number)
-values ('Bloom Studio', 'demo@bloom.studio', '+15551234567')
-on conflict (owner_email) do nothing;
+create policy "Allow all for service role" on call_extractions for all using (true);
