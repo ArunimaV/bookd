@@ -144,7 +144,7 @@ function HeroGeometric({
         />
       </div>
 
-      <div className="relative z-10 container mx-auto px-4 md:px-6">
+      <div className="relative z-20 container mx-auto px-4 md:px-6">
         <div className="max-w-3xl mx-auto text-center">
           <motion.div
             custom={0}
@@ -204,12 +204,12 @@ function HeroGeometric({
               Get Started
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
-            <Link
+            {/*<Link
               href="/login"
               className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
             >
               Already have an account? <span className="underline underline-offset-2">Log in!</span>
-            </Link>
+            </Link>*/}
           </motion.div>
         </div>
       </div>
