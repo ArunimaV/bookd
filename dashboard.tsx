@@ -110,7 +110,7 @@ function TabContent({ activeTab, business, onBusinessUpdate }: TabContentProps):
   return (
     <Suspense fallback={<TabLoadingFallback />}>
       {activeTab === "inbox" && <InboxTab leads={LEADS} />}
-      {activeTab === "calendar" && <CalendarTab appointments={APPOINTMENTS} />}
+      {activeTab === "calendar" && <CalendarTab appointments={APPOINTMENTS} agentPhoneNumber={business?.teli_phone_number || null} />}
       {activeTab === "leads" && <LeadsTab leads={LEADS} />}
       {activeTab === "business_analytics" && (
         <BusinessAnalyticsTab
