@@ -1,25 +1,37 @@
 import { createAdminClient } from './supabase/server'
 
 // ============================================
-// REQUIRED INPUTS FOR ONBOARDING
+// INPUTS FOR CREATING BUSINESS WITH TELI IDS
 // ============================================
-// Use this as a reference for your UI form fields
 
-export interface OnboardingInputs {
+export interface CreateBusinessInputs {
+  // Pre-generated ID
+  id: string
+
   // User/Owner Info
-  ownerEmail: string          // Required - unique identifier for the user
-  ownerName?: string          // Optional - for display purposes
-  userId?: string             // Optional - Supabase Auth user ID (if authenticated)
+  ownerEmail: string
+  ownerName: string
 
-  // Organization Info
-  orgName: string             // Required - business name (e.g., "Bloom Studio")
-  timezone?: string           // Optional - defaults to "America/New_York"
+  // Business Info
+  orgName: string
+  timezone?: string
 
-  // Phone Number
-  phoneNumber: string         // Required - Teli phone number (e.g., "+15551234567")
+  // Phone Setup
+  areaCode: string
 
-  // Voice Agent
-  voiceAgentId: string        // Required - Teli agent ID to attach to phone
+  // Voice Agent Configuration
+  agentNickname: string
+  startingMessage: string
+  agentPrompt: string
+  voiceId: string
+
+  // Custom Extraction Fields
+  customExtractionFields?: string[]
+
+  // Teli IDs (from successful Teli setup)
+  teliUserId: string
+  teliPhoneNumber: string
+  teliAgentId: string
 
   // Optional Business Details
   workHours?: {
@@ -33,7 +45,7 @@ export interface OnboardingInputs {
   }
   services?: Array<{
     name: string
-    duration: number  // in minutes
+    duration: number
     price: number
   }>
 }
@@ -43,14 +55,11 @@ export interface OnboardingInputs {
 // ============================================
 
 /**
- * Complete onboarding - creates org, user, phone, and attaches agent
- * This is the main function to call from your UI
+ * Create business record in Supabase WITH Teli IDs already set
+ * Call this ONLY after Teli setup succeeds
  */
-export async function completeOnboarding(inputs: OnboardingInputs) {
+export async function createBusinessWithTeliIds(inputs: CreateBusinessInputs) {
   const supabase = createAdminClient()
-
-  // Use auth user ID if provided, otherwise generate one
-  const userId = inputs.userId || crypto.randomUUID()
 
   // Create slug from org name
   const slug = inputs.orgName
@@ -75,16 +84,29 @@ export async function completeOnboarding(inputs: OnboardingInputs) {
     { name: "Standard Service", duration: 60, price: 50 },
   ]
 
-  // Insert the business (which includes user, phone, and agent)
+  // Insert the business with Teli IDs already included
   const { data, error } = await supabase
     .from('businesses')
     .insert({
-      user_id: userId,
+      id: inputs.id,
+      user_id: inputs.id, // Use same ID for user_id
       owner_email: inputs.ownerEmail,
+      owner_name: inputs.ownerName,
       name: inputs.orgName,
       business_name: slug,
-      login_phone_number: inputs.phoneNumber,
-      teli_agent_id: inputs.voiceAgentId,
+      area_code: inputs.areaCode,
+      agent_nickname: inputs.agentNickname,
+      starting_message: inputs.startingMessage,
+      teli_agent_prompt: inputs.agentPrompt,
+      voice_id: inputs.voiceId,
+      custom_fields: {
+        extraction_fields: inputs.customExtractionFields || [],
+      },
+      // Teli IDs from successful setup
+      teli_user_id: inputs.teliUserId,
+      teli_phone_number: inputs.teliPhoneNumber,
+      teli_agent_id: inputs.teliAgentId,
+      // Other settings
       timezone: inputs.timezone || 'America/New_York',
       work_hours: inputs.workHours || defaultWorkHours,
       services: inputs.services || defaultServices,
@@ -99,48 +121,7 @@ export async function completeOnboarding(inputs: OnboardingInputs) {
   return {
     success: true,
     business: data,
-    message: `Successfully created "${inputs.orgName}" with phone ${inputs.phoneNumber} and agent ${inputs.voiceAgentId}`
   }
-}
-
-/**
- * Update voice agent ID for an existing business
- */
-export async function attachVoiceAgent(businessId: string, voiceAgentId: string) {
-  const supabase = createAdminClient()
-
-  const { data, error } = await supabase
-    .from('businesses')
-    .update({ teli_agent_id: voiceAgentId })
-    .eq('id', businessId)
-    .select()
-    .single()
-
-  if (error) {
-    return { success: false, error: error.message }
-  }
-
-  return { success: true, business: data }
-}
-
-/**
- * Update phone number for an existing business
- */
-export async function updatePhoneNumber(businessId: string, phoneNumber: string) {
-  const supabase = createAdminClient()
-
-  const { data, error } = await supabase
-    .from('businesses')
-    .update({ teli_phone_number: phoneNumber })
-    .eq('id', businessId)
-    .select()
-    .single()
-
-  if (error) {
-    return { success: false, error: error.message }
-  }
-
-  return { success: true, business: data }
 }
 
 /**
@@ -153,6 +134,25 @@ export async function getBusinessByEmail(ownerEmail: string) {
     .from('businesses')
     .select('*')
     .eq('owner_email', ownerEmail)
+    .single()
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  return { success: true, business: data }
+}
+
+/**
+ * Get business by ID
+ */
+export async function getBusinessById(businessId: string) {
+  const supabase = createAdminClient()
+
+  const { data, error } = await supabase
+    .from('businesses')
+    .select('*')
+    .eq('id', businessId)
     .single()
 
   if (error) {
