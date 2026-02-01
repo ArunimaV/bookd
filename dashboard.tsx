@@ -126,12 +126,25 @@ function TabContent({ activeTab, business, onBusinessUpdate }: TabContentProps):
   );
 }
 
-export default function App(): ReactNode {
+// Map TabId to URL path
+const TAB_TO_URL: Record<TabId, string> = {
+  calendar: "/calendar",
+  inbox: "/inbox",
+  leads: "/leads",
+  business_analytics: "/analytics",
+  your_agent: "/agent",
+};
+
+interface AppProps {
+  defaultTab?: TabId;
+}
+
+export default function App({ defaultTab = "calendar" }: AppProps): ReactNode {
   const router = useRouter();
   // Memoize supabase client to prevent recreation on every render
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
-  const [activeTab, setActiveTab] = useState<TabId>("calendar");
+  const activeTab = defaultTab;
   const [business, setBusiness] = useState<any>(null);
   const [user, setUser] = useState<any>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -205,7 +218,7 @@ export default function App(): ReactNode {
   };
 
   const handleTabChange = (tabId: TabId) => {
-    setActiveTab(tabId);
+    router.push(TAB_TO_URL[tabId]);
   };
 
   const handleLogout = async () => {
@@ -299,7 +312,7 @@ export default function App(): ReactNode {
           newCustomers={newCustomers}
           onDismiss={clearNewCustomers}
           onViewAll={() => {
-            setActiveTab("leads");
+            router.push("/leads");
             clearNewCustomers();
           }}
         />
