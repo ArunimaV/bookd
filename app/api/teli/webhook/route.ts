@@ -27,7 +27,6 @@ const UNIVERSAL_FIELDS = [
   'day',
   'month',
   'phone',
-  'email'
 ];
 
 // Split extracted fields into universal and custom

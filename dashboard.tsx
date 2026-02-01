@@ -1,5 +1,6 @@
 import React, { useState, useEffect, Suspense, lazy, ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { HiSparkles } from "react-icons/hi2";
 
 // Theme & Styles
 import { C, FONT_LINK } from "./dashboard/theme";
@@ -31,6 +32,9 @@ const LeadsTab = lazy(() =>
 );
 const BusinessAnalyticsTab = lazy(() =>
   import("./dashboard/tabs/BusinessAnalyticsTab").then((m) => ({ default: m.BusinessAnalyticsTab }))
+);
+const YourAgentTab = lazy(() =>
+  import("./dashboard/tabs/YourAgentTab").then((m) => ({ default: m.YourAgentTab }))
 );
 
 // Loading fallback component
@@ -79,6 +83,12 @@ function getTabDefinitions(leads: Lead[]): TabDef[] {
       icon: Icons.chartBar,
       count: null,
     },
+    {
+      id: "your_agent",
+      label: "Your Agent",
+      icon: (c: string = C.textSoft, s: number = 20): ReactNode => <HiSparkles size={s} color={c} />,
+      count: null,
+    }
   ];
 }
 
@@ -96,6 +106,7 @@ function TabContent({ activeTab }: { activeTab: TabId }): ReactNode {
           employees={EMPLOYEES}
         />
       )}
+      {activeTab === "your_agent" && <YourAgentTab />}
     </Suspense>
   );
 }
