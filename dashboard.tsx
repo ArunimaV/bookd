@@ -15,6 +15,12 @@ import { LEADS, APPOINTMENTS, WEEKLY_STATS, EMPLOYEES, BUSINESS_ANALYTICS } from
 import { Header } from "./dashboard/components/Header";
 import { StatsGrid } from "./dashboard/components/StatsGrid";
 import { OnboardingForm } from "./dashboard/components/OnboardingForm";
+import { NewCallsNotification } from "./dashboard/components/NewCallsNotification";
+import { SyncButton } from "./dashboard/components/SyncButton";
+
+// Hooks
+import { useNewCalls } from "./dashboard/hooks/useNewCalls";
+import { useTeliSync } from "./dashboard/hooks/useTeliSync";
 
 // Types
 import type { TabId, TabDef, Lead } from "./dashboard/types";
@@ -108,6 +114,25 @@ export default function App(): ReactNode {
 
   const tabs = getTabDefinitions(LEADS);
 
+  // Poll for new calls/customers from Supabase
+  const { newCustomers, clearNewCustomers, refetch: refetchCustomers } = useNewCalls({
+    businessId: business?.id,
+    pollInterval: 5000, // Check every 5 seconds
+    enabled: !!business,
+  });
+
+  // Sync calls from Teli API to Supabase (manual only)
+  const { lastSync, isSyncing, lastResult, syncNow } = useTeliSync({
+    businessId: business?.id,
+    agentId: business?.teli_agent_id,
+  });
+
+  // When sync completes, refetch customers to show new data
+  const handleSyncNow = async () => {
+    await syncNow();
+    refetchCustomers();
+  };
+
   // Check if business exists (using localStorage for demo)
   useEffect(() => {
     const savedBusiness = localStorage.getItem("teli_business");
@@ -186,12 +211,32 @@ export default function App(): ReactNode {
 
         {/* Main Content */}
         <div style={{ padding: "20px 28px" }}>
+          {/* Sync Button Row */}
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+            <SyncButton
+              onSync={handleSyncNow}
+              isSyncing={isSyncing}
+              lastSync={lastSync}
+              lastResult={lastResult}
+            />
+          </div>
+
           {/* Stats Grid */}
           <StatsGrid stats={WEEKLY_STATS} />
 
           {/* Tab Content (Code Split) */}
           <TabContent activeTab={activeTab} />
         </div>
+
+        {/* New Calls Notification */}
+        <NewCallsNotification
+          newCustomers={newCustomers}
+          onDismiss={clearNewCustomers}
+          onViewAll={() => {
+            setActiveTab("leads");
+            clearNewCustomers();
+          }}
+        />
       </div>
     </>
   );
