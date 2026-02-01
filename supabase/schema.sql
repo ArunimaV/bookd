@@ -14,7 +14,7 @@ create table if not exists businesses (
   name text not null,            -- Display name (e.g., "Bloom Studio")
   business_name text not null,   -- URL-safe slug (e.g., "bloom-studio")
   owner_email text not null unique,
-  teli_phone_number text,
+  login_phone_number text,
   teli_agent_id text,
   google_calendar_id text,
   work_hours jsonb default '{

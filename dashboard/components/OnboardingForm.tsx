@@ -3,13 +3,14 @@ import { C } from "../theme";
 
 interface OnboardingFormProps {
   onComplete: (business: any) => void;
+  userEmail: string;
+  userId: string;
 }
 
-export function OnboardingForm({ onComplete }: OnboardingFormProps) {
+export function OnboardingForm({ onComplete, userEmail, userId }: OnboardingFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    ownerEmail: "",
     orgName: "",
     phoneNumber: "",
     voiceAgentId: "",
@@ -29,7 +30,11 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
       const response = await fetch("/api/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          ownerEmail: userEmail,
+          userId,
+        }),
       });
 
       const data = await response.json();
@@ -138,16 +143,17 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
         {/* Form */}
         <form onSubmit={handleSubmit}>
           <div style={fieldStyle}>
-            <label style={labelStyle}>Your Email</label>
-            <input
-              type="email"
-              name="ownerEmail"
-              value={formData.ownerEmail}
-              onChange={handleChange}
-              placeholder="you@example.com"
-              required
-              style={inputStyle}
-            />
+            <label style={labelStyle}>Logged in as</label>
+            <div
+              style={{
+                ...inputStyle,
+                background: C.bg,
+                color: C.textMuted,
+                cursor: "default",
+              }}
+            >
+              {userEmail}
+            </div>
           </div>
 
           <div style={fieldStyle}>
