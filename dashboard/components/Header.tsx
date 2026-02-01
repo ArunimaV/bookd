@@ -8,9 +8,10 @@ interface HeaderProps {
   activeTab: TabId;
   onTabChange: (tabId: TabId) => void;
   onLogout?: () => void;
+  businessName?: string;
 }
 
-export function Header({ tabs, activeTab, onTabChange, onLogout }: HeaderProps) {
+export function Header({ tabs, activeTab, onTabChange, onLogout, businessName }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -253,13 +254,13 @@ export function Header({ tabs, activeTab, onTabChange, onLogout }: HeaderProps) 
             />
             <p
               style={{
-                fontSize: 12,
+                fontSize: 17,
                 color: C.textMuted,
                 margin: "4px 0 0 0",
-                marginLeft: "2px", // Move Bloom Studio text 2px to the right
+                marginLeft: "2px", // Move business name text 2px to the right
               }}
             >
-              Bloom Studio
+              {businessName || "Your Business"}
             </p>
           </div>
         </div>
