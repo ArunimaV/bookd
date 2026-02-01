@@ -2,6 +2,13 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // Skip auth check for API routes (they handle their own auth)
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.next()
+  }
+
   let response = NextResponse.next({
     request: { headers: request.headers },
   })
@@ -32,20 +39,18 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Refresh session (important for token refresh)
-  const { data: { user } } = await supabase.auth.getUser()
-
-  const { pathname } = request.nextUrl
+  // Use getSession for faster check (doesn't make API call)
+  const { data: { session } } = await supabase.auth.getSession()
 
   // If not authenticated and trying to access protected routes, redirect to login
-  if (!user && pathname !== '/login') {
+  if (!session && pathname !== '/login') {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
   // If authenticated and on login page, redirect to dashboard
-  if (user && pathname === '/login') {
+  if (session && pathname === '/login') {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)
@@ -61,8 +66,7 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization)
      * - favicon.ico, logo.svg (public assets)
-     * - api/teli/webhook (external Teli webhook — no auth)
      */
-    '/((?!_next/static|_next/image|favicon.ico|logo.svg|api/teli/webhook).*)',
+    '/((?!_next/static|_next/image|favicon.ico|logo.svg).*)',
   ],
 }

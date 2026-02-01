@@ -1,5 +1,6 @@
-import React, { useState, useEffect, Suspense, lazy, ReactNode } from "react";
+import React, { useState, useEffect, Suspense, lazy, ReactNode, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { HiSparkles } from "react-icons/hi2";
 import { createBrowserSupabaseClient } from "./lib/supabase/client";
 
 // Theme & Styles
@@ -38,6 +39,9 @@ const LeadsTab = lazy(() =>
 );
 const BusinessAnalyticsTab = lazy(() =>
   import("./dashboard/tabs/BusinessAnalyticsTab").then((m) => ({ default: m.BusinessAnalyticsTab }))
+);
+const YourAgentTab = lazy(() =>
+  import("./dashboard/tabs/YourAgentTab").then((m) => ({ default: m.YourAgentTab }))
 );
 
 // Loading fallback component
@@ -86,15 +90,27 @@ function getTabDefinitions(leads: Lead[]): TabDef[] {
       icon: Icons.chartBar,
       count: null,
     },
+    {
+      id: "your_agent",
+      label: "Your Agent",
+      icon: (c?: string, s?: number) => <HiSparkles size={s || 20} color={c || "#6B5D4D"} />,
+      count: null,
+    },
   ];
 }
 
 // Tab content renderer with code splitting
-function TabContent({ activeTab }: { activeTab: TabId }): ReactNode {
+interface TabContentProps {
+  activeTab: TabId;
+  business?: any;
+  onBusinessUpdate?: (business: any) => void;
+}
+
+function TabContent({ activeTab, business, onBusinessUpdate }: TabContentProps): ReactNode {
   return (
     <Suspense fallback={<TabLoadingFallback />}>
       {activeTab === "inbox" && <InboxTab leads={LEADS} />}
-      {activeTab === "calendar" && <CalendarTab appointments={APPOINTMENTS} />}
+      {activeTab === "calendar" && <CalendarTab appointments={APPOINTMENTS} agentPhoneNumber={business?.teli_phone_number || null} />}
       {activeTab === "leads" && <LeadsTab leads={LEADS} />}
       {activeTab === "business_analytics" && (
         <BusinessAnalyticsTab
@@ -103,18 +119,36 @@ function TabContent({ activeTab }: { activeTab: TabId }): ReactNode {
           employees={EMPLOYEES}
         />
       )}
+      {activeTab === "your_agent" && business && onBusinessUpdate && (
+        <YourAgentTab business={business} onBusinessUpdate={onBusinessUpdate} />
+      )}
     </Suspense>
   );
 }
 
-export default function App(): ReactNode {
-  const router = useRouter();
-  const supabase = createBrowserSupabaseClient();
+// Map TabId to URL path
+const TAB_TO_URL: Record<TabId, string> = {
+  calendar: "/calendar",
+  inbox: "/inbox",
+  leads: "/leads",
+  business_analytics: "/analytics",
+  your_agent: "/agent",
+};
 
-  const [activeTab, setActiveTab] = useState<TabId>("calendar");
+interface AppProps {
+  defaultTab?: TabId;
+}
+
+export default function App({ defaultTab = "calendar" }: AppProps): ReactNode {
+  const router = useRouter();
+  // Memoize supabase client to prevent recreation on every render
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+
+  const activeTab = defaultTab;
   const [business, setBusiness] = useState<any>(null);
   const [user, setUser] = useState<any>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const authCheckedRef = useRef(false);
 
   const tabs = getTabDefinitions(LEADS);
 
@@ -139,39 +173,52 @@ export default function App(): ReactNode {
 
   // Check auth session and fetch business
   useEffect(() => {
+    // Prevent double-running in strict mode or on re-renders
+    if (authCheckedRef.current) return;
+    authCheckedRef.current = true;
+
     const checkAuth = async () => {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
 
-      if (!authUser) {
-        router.push("/login");
-        return;
+        // Middleware handles redirect to /login if no session
+        // Just set state here, don't redirect
+        if (!session?.user) {
+          setCheckingAuth(false);
+          return;
+        }
+
+        const authUser = session.user;
+        setUser(authUser);
+
+        // Fetch business for this user
+        const { data: bizData } = await supabase
+          .from("businesses")
+          .select("*")
+          .eq("user_id", authUser.id)
+          .single();
+
+        if (bizData) {
+          setBusiness(bizData);
+        }
+
+        setCheckingAuth(false);
+      } catch (error) {
+        console.error("Auth check error:", error);
+        setCheckingAuth(false);
       }
-
-      setUser(authUser);
-
-      // Fetch business for this user
-      const { data: bizData } = await supabase
-        .from("businesses")
-        .select("*")
-        .eq("user_id", authUser.id)
-        .single();
-
-      if (bizData) {
-        setBusiness(bizData);
-      }
-
-      setCheckingAuth(false);
     };
 
     checkAuth();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [supabase]);
 
-  const handleOnboardingComplete = (newBusiness: any) => {
-    setBusiness(newBusiness);
+  const handleOnboardingComplete = (result: { business: any; phoneNumber: string; agentId: string }) => {
+    // Extract the business object from the result
+    setBusiness(result.business);
   };
 
   const handleTabChange = (tabId: TabId) => {
-    setActiveTab(tabId);
+    router.push(TAB_TO_URL[tabId]);
   };
 
   const handleLogout = async () => {
@@ -253,7 +300,11 @@ export default function App(): ReactNode {
           <StatsGrid stats={WEEKLY_STATS} />
 
           {/* Tab Content (Code Split) */}
-          <TabContent activeTab={activeTab} />
+          <TabContent
+            activeTab={activeTab}
+            business={business}
+            onBusinessUpdate={setBusiness}
+          />
         </div>
 
         {/* New Calls Notification */}
@@ -261,7 +312,7 @@ export default function App(): ReactNode {
           newCustomers={newCustomers}
           onDismiss={clearNewCustomers}
           onViewAll={() => {
-            setActiveTab("leads");
+            router.push("/leads");
             clearNewCustomers();
           }}
         />

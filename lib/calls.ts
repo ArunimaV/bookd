@@ -63,6 +63,46 @@ function splitExtractedFields(extractedFields: Record<string, string> | undefine
   return { universal, custom }
 }
 
+function extractTranscript(payload: any): string | undefined {
+  if (!payload || typeof payload !== 'object') return undefined
+  if (typeof payload.transcript === 'string') return payload.transcript
+  if (typeof payload.call?.transcript === 'string') return payload.call.transcript
+  if (typeof payload.data?.transcript === 'string') return payload.data.transcript
+  if (typeof payload.result?.transcript === 'string') return payload.result.transcript
+  return undefined
+}
+
+export async function fetchCallTranscript(callId: string): Promise<string | undefined> {
+  const apiUrl = process.env.API_URL
+  const apiKey = process.env.TELI_API_KEY
+
+  if (!apiUrl || !apiKey) {
+    console.warn('Missing API_URL or TELI_API_KEY; skipping transcript fetch')
+    return undefined
+  }
+
+  try {
+    const normalizedBase = apiUrl.replace(/\/$/, '')
+    const response = await fetch(`${normalizedBase}/v1/voice/calls/${callId}`, {
+      method: 'GET',
+      headers: {
+        'X-API-Key': apiKey,
+      },
+    })
+
+    if (!response.ok) {
+      console.warn('Failed to fetch call details', response.status, response.statusText)
+      return undefined
+    }
+
+    const data = await response.json()
+    return extractTranscript(data)
+  } catch (error) {
+    console.error('Error fetching call transcript:', error)
+    return undefined
+  }
+}
+
 
 // ============================================
 // MAIN FUNCTIONS
@@ -79,6 +119,9 @@ export async function processCallAndStoreCustomer(
   const supabase = createAdminClient()
 
   try {
+    const transcript =
+      callData.transcript || (callData.call_id ? await fetchCallTranscript(callData.call_id) : undefined)
+
     // Split extracted fields into universal and custom
     const { universal, custom } = splitExtractedFields(callData.extracted_fields)
 
@@ -104,6 +147,7 @@ export async function processCallAndStoreCustomer(
           phone_number: callData.phone_number,
           email: universal.email || null,
           custom_fields: custom,
+          call_transcript: transcript || null,
         })
         .select()
         .single()
@@ -116,14 +160,20 @@ export async function processCallAndStoreCustomer(
       const existingCustomFields = (existingCustomer.custom_fields as Record<string, string>) || {}
       const mergedCustomFields = { ...existingCustomFields, ...custom }
 
+      const updatePayload: Record<string, any> = {
+        first_name: universal.first_name || existingCustomer.first_name,
+        last_name: universal.last_name || existingCustomer.last_name,
+        email: universal.email || existingCustomer.email,
+        custom_fields: mergedCustomFields,
+      }
+
+      if (transcript) {
+        updatePayload.call_transcript = transcript
+      }
+
       const { data: updatedCustomer, error } = await supabase
         .from('customers')
-        .update({
-          first_name: universal.first_name || existingCustomer.first_name,
-          last_name: universal.last_name || existingCustomer.last_name,
-          email: universal.email || existingCustomer.email,
-          custom_fields: mergedCustomFields,
-        })
+        .update(updatePayload)
         .eq('id', existingCustomer.id)
         .select()
         .single()
@@ -138,7 +188,7 @@ export async function processCallAndStoreCustomer(
       customer_id: customer.id,
       direction: 'inbound',
       channel: 'call',
-      content: callData.transcript || `Call from ${callData.phone_number}`,
+      content: transcript || callData.transcript || `Call from ${callData.phone_number}`,
       teli_data: callData as any,
     })
 

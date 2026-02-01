@@ -177,12 +177,12 @@ export function Header({ tabs, activeTab, onTabChange, onLogout }: HeaderProps) 
               fontSize: 15,
               fontWeight: 600,
               cursor: "pointer",
-              border: `1px solid ${C.border}`,
+              border: `1px solid ${C.red}`,
               fontFamily: "inherit",
               textAlign: "left",
               transition: "all 0.15s",
-              background: "transparent",
-              color: C.textMuted,
+              background: C.red,
+              color: "#fff",
               marginTop: 8,
             }}
           >
