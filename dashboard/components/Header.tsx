@@ -202,17 +202,29 @@ export function Header({ tabs, activeTab, onTabChange }: HeaderProps) {
               marginRight: 4,
             }}
           />
-          {/* Replace text with logo */}
-          <img
-            src="/logo.svg"
-            alt="Bloom Studio"
-            style={{
-              width: 140,
-              height: "auto",
-              display: "block",
-              marginLeft: 3, // if you want to nudge it right, adjust as needed
-            }}
-          />
+          {/* Logo and subtitle */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+            <img
+              src="/logo.svg"
+              alt="Bloom Studio"
+              style={{
+                width: 140,
+                height: "auto",
+                display: "block",
+                marginLeft: -5, // Move logo 2 more pixels to the left
+              }}
+            />
+            <p
+              style={{
+                fontSize: 12,
+                color: C.textMuted,
+                margin: "4px 0 0 0",
+                marginLeft: "2px", // Move Bloom Studio text 2px to the right
+              }}
+            >
+              Bloom Studio
+            </p>
+          </div>
         </div>
 
         {/* Status Indicator */}
